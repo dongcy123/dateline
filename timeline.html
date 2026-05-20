@@ -122,9 +122,28 @@
         const formatDate = (date) => new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(date);
 
         // ==========================================
-        // 初始数据 — 空，等待用户输入
+        // 从 localStorage 加载持久化数据
         // ==========================================
-        const initialEvents = [];
+        const loadEvents = () => {
+            try {
+                const raw = localStorage.getItem('kawakami_events');
+                if (raw) {
+                    const data = JSON.parse(raw);
+                    if (Array.isArray(data)) return data;
+                }
+            } catch (e) {
+                console.warn('加载本地数据失败，使用空数据');
+            }
+            return [];
+        };
+        const saveEvents = (events) => {
+            try {
+                localStorage.setItem('kawakami_events', JSON.stringify(events));
+            } catch (e) {
+                console.warn('保存本地数据失败');
+            }
+        };
+        const initialEvents = loadEvents();
 
         // ==========================================
         // API 密钥管理与配置
@@ -855,6 +874,11 @@
             const [events, setEvents] = useState(initialEvents);
             const [isHeatmapOpen, setIsHeatmapOpen] = useState(false);
             const [isProcessing, setIsProcessing] = useState(false);
+
+            // 每次 events 变化自动持久化到 localStorage
+            useEffect(() => {
+                saveEvents(events);
+            }, [events]);
             const [selectedDate, setSelectedDate] = useState(null);
             const [aiError, setAiError] = useState(null);
             const [showSettings, setShowSettings] = useState(false);

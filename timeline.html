@@ -6,11 +6,11 @@
     <title>川上</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 React 和 ReactDOM -->
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- 引入 React 和 ReactDOM (本地托管，避免 CDN 被拦截) -->
+    <script src="/static/react.js"></script>
+    <script src="/static/react-dom.js"></script>
     <!-- 引入 Babel 编译 JSX -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="/static/babel.js"></script>
 
     <script>
         tailwind.config = {

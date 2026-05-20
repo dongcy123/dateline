@@ -46,7 +46,6 @@ const server = http.createServer((req, res) => {
         let targetUrl, targetBody, headers;
 
         if (engine === 'vision' && image_url) {
-          // Vision API (Qwen-VL / GPT-4o)
           const visionBaseUrl = process.env.VISION_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
           const visionKey = process.env.VISION_KEY;
           const visionModel = process.env.VISION_MODEL || 'qwen-vl-max';
@@ -65,7 +64,6 @@ const server = http.createServer((req, res) => {
             temperature: 0.3,
           });
         } else if (engine === 'text' && text) {
-          // DeepSeek API
           const deepseekKey = process.env.DEEPSEEK_KEY;
           if (!deepseekKey) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -87,18 +85,28 @@ const server = http.createServer((req, res) => {
           return res.end(JSON.stringify({ error: { code: 'bad_request', message: '需要提供 text 或 image_url' } }));
         }
 
+        console.log(`[proxy] → ${engine}`);
         const aiRes = await fetch(targetUrl, { method: 'POST', headers, body: targetBody });
-        const aiData = await aiRes.json();
+        const aiText = await aiRes.text();
 
         if (!aiRes.ok) {
-          res.writeHead(aiRes.status, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ error: { code: 'ai_api_error', message: `AI API 错误 (${aiRes.status})` } }));
+          console.error(`[proxy] upstream ${aiRes.status}:`, aiText.substring(0, 300));
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: { code: 'ai_api_error', message: `AI API ${aiRes.status}: ${aiText.substring(0, 120)}` } }));
+        }
+
+        let aiData;
+        try { aiData = JSON.parse(aiText); } catch {
+          console.error('[proxy] bad JSON from upstream');
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: { code: 'bad_upstream', message: 'AI 返回非 JSON' } }));
         }
 
         const content = aiData.choices?.[0]?.message?.content;
         if (!content) {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ error: { code: 'parse_error', message: 'AI 返回为空' } }));
+          console.error('[proxy] empty content');
+          res.writeHead(502, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ error: { code: 'empty_response', message: 'AI 返回为空' } }));
         }
 
         let result;
@@ -107,9 +115,11 @@ const server = http.createServer((req, res) => {
         } catch {
           result = JSON.parse(content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
         }
+        console.log(`[proxy] ✓ ${engine} → ${result.type}`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
       } catch (err) {
+        console.error('[proxy] internal:', err.message);
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: { code: 'internal', message: err.message } }));
       }
@@ -139,6 +149,6 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`川上 running on port ${PORT}`);
-  console.log(`Proxy: ${process.env.DEEPSEEK_KEY ? 'DeepSeek ✓' : 'DeepSeek ✗'}`);
-  console.log(`Proxy: ${process.env.VISION_KEY ? 'Vision ✓' : 'Vision ✗'}`);
+  console.log(`DEEPSEEK_KEY: ${process.env.DEEPSEEK_KEY ? '✓ configured' : '✗ missing'}`);
+  console.log(`VISION_KEY:   ${process.env.VISION_KEY ? '✓ configured' : '✗ missing'}`);
 });

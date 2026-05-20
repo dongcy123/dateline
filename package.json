@@ -2,9 +2,10 @@
   "name": "timeline-os",
   "version": "0.1.0",
   "description": "单页面极简个人管理系统 — AI-powered bi-directional timeline for expense, todos, and notes",
-  "main": "expo-router/entry",
+  "main": "server.js",
   "scripts": {
-    "start": "expo start",
+    "start": "node server.js",
+    "expo": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",

@@ -11,6 +11,8 @@
     <script src="/static/react-dom.js"></script>
     <!-- 引入 Babel 编译 JSX -->
     <script src="/static/babel.js"></script>
+    <!-- 引入 Supabase JS SDK -->
+    <script src="/static/supabase.js"></script>
 
     <script>
         tailwind.config = {
@@ -117,7 +119,12 @@
             Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         };
 
-        const generateId = () => Math.random().toString(36).substr(2, 9);
+        const generateId = () => {
+            if (window.crypto && window.crypto.randomUUID) {
+                return window.crypto.randomUUID();
+            }
+            return Math.random().toString(36).substr(2, 9);
+        };
         const formatTime = (date) => new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(date);
         const formatDate = (date) => new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(date);
 
@@ -186,6 +193,78 @@
                     return true;
                 },
             };
+        };
+
+        // ==========================================
+        // Supabase 数据层
+        // ==========================================
+        let supabaseClient = null;
+
+        const getSupabase = () => {
+            if (supabaseClient) return supabaseClient;
+            const config = getConfig();
+            if (config.supabaseUrl && config.supabaseKey && window.supabase) {
+                const sb = window.supabase;
+                // UMD 可能暴露 createClient 函数或 { createClient } 对象
+                const createClient = typeof sb === 'function' ? sb : sb.createClient;
+                if (createClient) {
+                    supabaseClient = createClient(config.supabaseUrl, config.supabaseKey);
+                    console.log('[Supabase] connected');
+                }
+            }
+            return supabaseClient;
+        };
+
+        const hasBackend = () => {
+            const config = getConfig();
+            return !!(config.supabaseUrl && config.supabaseKey);
+        };
+
+        const loadFromBackend = async () => {
+            const sb = getSupabase();
+            if (!sb) return null;
+            const { data, error } = await sb
+                .from('timeline_events')
+                .select('*')
+                .order('timeline_time', { ascending: false });
+            if (error) {
+                console.error('[Supabase] load error:', error.message);
+                return null;
+            }
+            // 映射数据库字段名
+            return (data || []).map(row => ({
+                id: row.id,
+                timeline_time: row.timeline_time,
+                record_time: row.record_time,
+                raw_content: row.raw_content,
+                type: row.type,
+                status: row.status,
+                ai_metadata: row.ai_metadata || {},
+                _from_db: true,
+            }));
+        };
+
+        const saveToBackend = async (event) => {
+            const sb = getSupabase();
+            if (!sb) return;
+            const row = {
+                id: event.id,
+                timeline_time: event.timeline_time,
+                record_time: event.record_time,
+                raw_content: event.raw_content,
+                type: event.type,
+                status: event.status,
+                ai_metadata: event.ai_metadata || {},
+            };
+            const { error } = await sb.from('timeline_events').upsert(row);
+            if (error) console.error('[Supabase] save error:', error.message);
+        };
+
+        const deleteFromBackend = async (id) => {
+            const sb = getSupabase();
+            if (!sb) return;
+            const { error } = await sb.from('timeline_events').delete().eq('id', id);
+            if (error) console.error('[Supabase] delete error:', error.message);
         };
 
         const SYSTEM_PROMPT = `你是一个个人管理助手。分析用户输入并返回严格的 JSON。
@@ -879,6 +958,29 @@
             useEffect(() => {
                 saveEvents(events);
             }, [events]);
+
+            // 启动时从 Supabase 加载，有后端数据则优先
+            const [backendLoaded, setBackendLoaded] = useState(false);
+            useEffect(() => {
+                if (hasBackend()) {
+                    loadFromBackend().then(backendEvents => {
+                        if (backendEvents && backendEvents.length > 0) {
+                            setEvents(backendEvents);
+                            console.log(`[Supabase] loaded ${backendEvents.length} events`);
+                        } else if (initialEvents.length > 0) {
+                            // 本地有数据但后端空 → 迁移本地到后端
+                            console.log('[Supabase] migrating localStorage → backend');
+                            initialEvents.forEach(e => saveToBackend(e));
+                        }
+                        setBackendLoaded(true);
+                    }).catch(err => {
+                        console.error('[Supabase] init error:', err);
+                        setBackendLoaded(true);
+                    });
+                } else {
+                    setBackendLoaded(true);
+                }
+            }, []);
             const [selectedDate, setSelectedDate] = useState(null);
             const [aiError, setAiError] = useState(null);
             const [showSettings, setShowSettings] = useState(false);
@@ -1107,6 +1209,7 @@
 
                 setEvents(prev => [newEvent, ...prev]);
                 setIsProcessing(false);
+                saveToBackend(newEvent);
 
                 setTimeout(() => {
                     if (nowMarkerRef.current) {
@@ -1189,22 +1292,32 @@
 
                 setEvents(prev => [newEvent, ...prev]);
                 setIsProcessing(false);
+                saveToBackend(newEvent);
             };
 
             const confirmEvent = (id) => {
-                setEvents(prev => prev.map(e => 
-                    e.id === id ? { ...e, status: e.type === 'todo' ? 'confirmed' : 'done' } : e
-                ));
+                setEvents(prev => {
+                    const next = prev.map(e =>
+                        e.id === id ? { ...e, status: e.type === 'todo' ? 'confirmed' : 'done' } : e
+                    );
+                    const updated = next.find(e => e.id === id);
+                    if (updated) saveToBackend(updated);
+                    return next;
+                });
             };
 
             const updateEvent = (id, updatedData) => {
-                setEvents(prev => prev.map(e => 
-                    e.id === id ? { ...e, ...updatedData } : e
-                ));
+                setEvents(prev => {
+                    const next = prev.map(e => e.id === id ? { ...e, ...updatedData } : e);
+                    const updated = next.find(e => e.id === id);
+                    if (updated) saveToBackend(updated);
+                    return next;
+                });
             };
 
             const deleteEvent = (id) => {
                 setEvents(prev => prev.filter(e => e.id !== id));
+                deleteFromBackend(id);
             };
 
             return (
@@ -1214,6 +1327,11 @@
 
                     {/* AI 引擎状态指示器 */}
                     <div className="absolute top-4 right-4 z-[60] flex items-center gap-2">
+                        {hasBackend() && (
+                            <span className="text-[10px] px-2 py-1 rounded-full border bg-green-500/10 border-green-500/30 text-green-400">
+                                🗄 Supabase
+                            </span>
+                        )}
                         <button
                             onClick={() => setShowSettings(!showSettings)}
                             className={`text-[10px] px-2 py-1 rounded-full border transition-all ${

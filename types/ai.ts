@@ -4,6 +4,8 @@ import type { EventType } from './event';
 export interface AIProxyResponse {
   type: EventType;
   ai_metadata: Record<string, unknown>;
+  /** ISO 8601 timestamp extracted from natural language, null = use current time */
+  timeline_time?: string | null;
   /** Confidence score 0-1, optional */
   confidence?: number;
   /** Raw AI output before normalization, for debug */

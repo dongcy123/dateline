@@ -888,7 +888,7 @@
 
                 const newEvent = {
                     id: generateId(),
-                    timeline_time: new Date().toISOString(),
+                    timeline_time: aiResult.timeline_time || new Date().toISOString(),
                     record_time: new Date().toISOString(),
                     raw_content: text,
                     type: aiResult.type,
@@ -970,7 +970,7 @@
 
                 const newEvent = {
                     id: generateId(),
-                    timeline_time: new Date().toISOString(),
+                    timeline_time: aiResult.timeline_time || new Date().toISOString(),
                     record_time: new Date().toISOString(),
                     raw_content: "[图片凭证已上传 - AI解析]",
                     type: aiResult.type,

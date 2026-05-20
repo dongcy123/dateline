@@ -433,7 +433,7 @@
             };
 
             return (
-                <div className="absolute top-0 w-full z-50">
+                <div className="fixed top-0 left-0 right-0 z-50">
                     {/* 半透明玻璃态 Header */}
                     <div className="bg-zinc-950/80 backdrop-blur-xl border-b border-white/10 px-4 pt-12 pb-4 flex flex-col gap-3">
                         <div className="flex justify-between items-end">
@@ -721,7 +721,7 @@
             };
 
             return (
-                <div className="absolute bottom-0 w-full p-4 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent pb-8 z-50">
+                <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent pb-8 z-50">
                     <form onSubmit={handleSubmit} className="flex items-center gap-2 max-w-lg mx-auto bg-zinc-900 border border-zinc-800 rounded-full p-1.5 pr-2 shadow-2xl backdrop-blur-xl transition-all focus-within:border-zinc-700">
                         
                         {/* 左侧：触发视觉多模态大模型 */}
@@ -1283,7 +1283,7 @@
                     {scrollZone !== 'now' && (
                         <button
                             onClick={scrollToNow}
-                            className={`absolute z-[70] left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full text-xs tracking-wider
+                            className={`fixed z-[70] left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full text-xs tracking-wider
                                 bg-zinc-900/90 border border-zinc-500/50 backdrop-blur-md
                                 text-white hover:bg-zinc-800
                                 transition-all duration-300 shadow-[0_0_20px_rgba(168,85,247,0.15),0_0_20px_rgba(96,165,250,0.15),0_0_20px_rgba(251,146,60,0.15)]

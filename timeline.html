@@ -711,6 +711,76 @@
 
         const Omnibox = ({ onSubmitText, onSimulateVision, isProcessing, engineStatus }) => {
             const [text, setText] = useState('');
+            const [isListening, setIsListening] = useState(false);
+            const [voiceSupported, setVoiceSupported] = useState(true);
+            const recognitionRef = useRef(null);
+
+            // 初始化语音识别
+            const getRecognition = () => {
+                if (recognitionRef.current) return recognitionRef.current;
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                if (!SpeechRecognition) {
+                    setVoiceSupported(false);
+                    return null;
+                }
+                const rec = new SpeechRecognition();
+                rec.lang = 'zh-CN';
+                rec.interimResults = true;
+                rec.maxAlternatives = 1;
+                rec.continuous = false; // 说完一句话自动停止
+
+                rec.onresult = (event) => {
+                    let transcript = '';
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        transcript += event.results[i][0].transcript;
+                    }
+                    setText(transcript);
+                    // 如果是最终结果，自动提交
+                    if (event.results[event.results.length - 1].isFinal) {
+                        setIsListening(false);
+                        // 稍微延迟，让用户看到识别结果
+                        setTimeout(() => {
+                            if (transcript.trim() && !isProcessing) {
+                                onSubmitText(transcript.trim());
+                                setText('');
+                            }
+                        }, 600);
+                    }
+                };
+
+                rec.onerror = (event) => {
+                    console.error('[Voice]', event.error);
+                    setIsListening(false);
+                    if (event.error === 'not-allowed') {
+                        setVoiceSupported(false);
+                    }
+                };
+
+                rec.onend = () => {
+                    setIsListening(false);
+                };
+
+                recognitionRef.current = rec;
+                return rec;
+            };
+
+            const toggleVoice = () => {
+                if (isListening) {
+                    recognitionRef.current?.stop();
+                    setIsListening(false);
+                    return;
+                }
+                const rec = getRecognition();
+                if (!rec) return;
+                try {
+                    rec.start();
+                    setIsListening(true);
+                    setText('');
+                } catch (err) {
+                    console.error('[Voice start]', err);
+                    setIsListening(false);
+                }
+            };
 
             const handleSubmit = (e) => {
                 e.preventDefault();
@@ -723,39 +793,56 @@
             return (
                 <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent pb-8 z-50">
                     <form onSubmit={handleSubmit} className="flex items-center gap-2 max-w-lg mx-auto bg-zinc-900 border border-zinc-800 rounded-full p-1.5 pr-2 shadow-2xl backdrop-blur-xl transition-all focus-within:border-zinc-700">
-                        
+
                         {/* 左侧：触发视觉多模态大模型 */}
-                        <button 
-                            type="button" 
+                        <button
+                            type="button"
                             onClick={onSimulateVision}
                             disabled={isProcessing}
                             className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors disabled:opacity-50">
                             <Icons.Camera />
                         </button>
-                        
+
                         {/* 中间：文本输入通道 */}
-                        <input 
-                            type="text" 
+                        <input
+                            type="text"
                             value={text}
                             onChange={(e) => setText(e.target.value)}
-                            placeholder={isProcessing ? (engineStatus === 'live' ? "DeepSeek AI 思考中..." : "本地引擎处理中...") : (engineStatus === 'live' ? "输入记录或指令... ⚡DeepSeek" : "输入记录或指令... (模拟引擎)")}
+                            placeholder={
+                                isProcessing ? (engineStatus === 'live' ? "AI 思考中..." : "处理中...") :
+                                isListening ? "正在聆听..." :
+                                (engineStatus === 'live' ? "输入或点🎤说话..." : "输入记录或指令...")
+                            }
                             disabled={isProcessing}
                             className="flex-1 bg-transparent border-none outline-none text-sm px-2 text-zinc-100 placeholder:text-zinc-600 disabled:opacity-50"
                         />
-                        
-                        {/* 右侧：提交或语音(此处模拟文本提交) */}
+
+                        {/* 右侧：语音或提交 */}
                         {text.trim() ? (
-                            <button 
-                                type="submit" 
+                            <button
+                                type="submit"
                                 disabled={isProcessing}
                                 className="w-10 h-10 rounded-full bg-white/15 text-white flex items-center justify-center hover:bg-white/25 transition-colors disabled:opacity-50">
                                 <Icons.Send />
                             </button>
-                        ) : (
-                            <button 
-                                type="button" 
+                        ) : voiceSupported ? (
+                            <button
+                                type="button"
+                                onClick={toggleVoice}
                                 disabled={isProcessing}
-                                className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors disabled:opacity-50">
+                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                                    isListening
+                                        ? 'bg-red-500/30 text-red-400 animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.4)]'
+                                        : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
+                                } disabled:opacity-50`}>
+                                <Icons.Mic />
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                disabled
+                                className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-600 disabled:opacity-30"
+                                title="浏览器不支持语音识别">
                                 <Icons.Mic />
                             </button>
                         )}

@@ -8,12 +8,16 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "serve": "node server.js",
     "playground": "cd playground && npx serve .",
     "lint": "eslint .",
     "test": "jest",
     "types": "tsc --noEmit",
     "db:types": "supabase gen types typescript --local > types/supabase.ts",
     "db:migrate": "supabase migration up"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",

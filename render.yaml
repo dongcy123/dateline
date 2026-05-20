@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: kawakami
+    runtime: node
+    buildCommand: ""
+    startCommand: node server.js
+    plan: free
+    envVars:
+      - key: DEEPSEEK_KEY
+        sync: false
+      - key: VISION_KEY
+        sync: false
+      - key: VISION_BASE_URL
+        value: https://dashscope.aliyuncs.com/compatible-mode/v1
+      - key: VISION_MODEL
+        value: qwen-vl-max

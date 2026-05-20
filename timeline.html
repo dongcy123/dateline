@@ -122,75 +122,9 @@
         const formatDate = (date) => new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(date);
 
         // ==========================================
-        // 核心更新：自动生成大量丰富的多维度模拟数据
+        // 初始数据 — 空，等待用户输入
         // ==========================================
-        const generateMockEvents = () => {
-            const data = [];
-            const now = new Date();
-            const tags = ['餐饮', '购物', '交通', '娱乐', '教育'];
-            const priorities = ['低', '普通', '高'];
-            
-            // 覆盖过去20天到未来10天
-            for (let i = -20; i <= 10; i++) {
-                const currentDate = new Date(now.getTime() + i * 24 * 60 * 60 * 1000);
-                
-                // 每天随机生成 0~5 条记录
-                const eventCount = Math.floor(Math.random() * 6);
-                
-                for (let j = 0; j < eventCount; j++) {
-                    const eventDate = new Date(currentDate);
-                    // 随机打乱当天的小时和分钟
-                    eventDate.setHours(Math.floor(Math.random() * 24), Math.floor(Math.random() * 60));
-                    
-                    // 随机决定这条记录的类型
-                    const r = Math.random();
-                    let type = r < 0.4 ? 'expense' : (r < 0.7 ? 'todo' : 'note');
-                    
-                    let ai_metadata = {};
-                    let raw_content = "";
-                    let status = (i < 0) ? 'done' : 'confirmed'; // 过去的默认done，未来的默认confirmed
-                    
-                    if (type === 'expense') {
-                        const isBigExpense = Math.random() > 0.8;
-                        const amount = isBigExpense ? Math.floor(Math.random() * 2000) + 500 : Math.floor(Math.random() * 150) + 10;
-                        const tag = tags[Math.floor(Math.random() * tags.length)];
-                        ai_metadata = { amount, tag };
-                        raw_content = isBigExpense ? `买了大件物品，花了 ${amount} 元` : `日常消费 ${amount} 元`;
-                    } else if (type === 'todo') {
-                        const priority = priorities[Math.floor(Math.random() * priorities.length)];
-                        ai_metadata = { task: `测试任务 ${generateId().substr(0,4)}`, priority };
-                        raw_content = priority === '高' ? `[紧急] 必须完成这个任务！` : `记得去处理一下这件事情`;
-                        if (i >= 0 && Math.random() > 0.5) status = 'pending'; // 未来的任务有概率是待确认
-                    } else {
-                        ai_metadata = { tags: ['灵感', '随记'] };
-                        raw_content = `灵感记录：今天突然想到一个好主意... (${generateId()})`;
-                    }
-
-                    data.push({
-                        id: generateId(),
-                        timeline_time: eventDate.toISOString(),
-                        record_time: new Date().toISOString(),
-                        raw_content,
-                        type,
-                        status,
-                        ai_metadata
-                    });
-                }
-            }
-            // 额外确保"现在"附近一定有数据
-            data.push({
-                id: generateId(),
-                timeline_time: new Date(now.getTime() - 1000 * 60 * 15).toISOString(),
-                record_time: new Date().toISOString(),
-                raw_content: "刚刚喝了一杯星巴克拿铁 32元",
-                type: "expense",
-                status: "done",
-                ai_metadata: { amount: 32, tag: "餐饮" }
-            });
-            return data;
-        };
-
-        const initialEvents = generateMockEvents();
+        const initialEvents = [];
 
         // ==========================================
         // API 密钥管理与配置

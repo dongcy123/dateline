@@ -179,8 +179,13 @@
                 visionBaseUrl: sessionStorage.getItem('vision_base_url') || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
                 supabaseUrl: sessionStorage.getItem('supabase_url') || '',
                 supabaseKey: sessionStorage.getItem('supabase_key') || '',
-                hasRealAI: () => !!(sessionStorage.getItem('deepseek_key') || sessionStorage.getItem('vision_key') || sessionStorage.getItem('supabase_url')),
+                proxyUrl: sessionStorage.getItem('proxy_url') || 'http://localhost:8765',
+                hasRealAI: () => !!(sessionStorage.getItem('deepseek_key') || sessionStorage.getItem('vision_key') || sessionStorage.getItem('supabase_url') || sessionStorage.getItem('proxy_url')),
                 hasProxy: () => !!(sessionStorage.getItem('supabase_url') && sessionStorage.getItem('supabase_key')),
+                hasLocalProxy: () => {
+                    // Local proxy is always preferred when available
+                    return true; // Always try local proxy first
+                },
             };
         };
 
@@ -286,7 +291,29 @@
         };
 
         // ==========================================
-        // Supabase Edge Function Proxy (推荐路径 — 密钥安全)
+        // 本地 AI 代理 (绕过 CORS — 开发环境首选)
+        // ==========================================
+        const callLocalProxy = async (request) => {
+            const config = getConfig();
+            const res = await fetch(config.proxyUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(request),
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw {
+                    code: err.error?.code || 'api_error',
+                    message: err.error?.message || `代理错误 (${res.status})`,
+                };
+            }
+
+            return res.json();
+        };
+
+        // ==========================================
+        // Supabase Edge Function Proxy
         // ==========================================
         const callSupabaseProxy = async (request) => {
             const config = getConfig();
@@ -838,7 +865,11 @@
                 let usedRealAI = false;
 
                 try {
-                    if (getConfig().hasProxy()) {
+                    // 优先级: 本地代理 > Edge Function > DeepSeek直接 > 模拟
+                    if (getConfig().hasLocalProxy()) {
+                        aiResult = await callLocalProxy({ text, engine: 'text' });
+                        usedRealAI = true;
+                    } else if (getConfig().hasProxy()) {
                         aiResult = await callSupabaseProxy({ text, engine: 'text' });
                         usedRealAI = true;
                     } else if (getConfig().hasRealAI()) {
@@ -862,7 +893,7 @@
                     raw_content: text,
                     type: aiResult.type,
                     status: 'pending',
-                    ai_metadata: { ...aiResult.ai_metadata, _engine: getConfig().hasProxy() ? 'supabase-proxy' : (usedRealAI ? 'deepseek' : 'mock') }
+                    ai_metadata: { ...aiResult.ai_metadata, _engine: getConfig().hasLocalProxy() ? 'local-proxy' : (getConfig().hasProxy() ? 'supabase-proxy' : (usedRealAI ? 'deepseek' : 'mock')) }
                 };
 
                 setEvents(prev => [newEvent, ...prev]);
@@ -882,8 +913,7 @@
                 let usedRealAI = false;
 
                 try {
-                    if (getConfig().hasProxy()) {
-                        // Edge Function proxy with file picker
+                    if (getConfig().hasLocalProxy() || getConfig().hasProxy() || getConfig().hasRealAI()) {
                         const input = document.createElement('input');
                         input.type = 'file';
                         input.accept = 'image/*';
@@ -898,7 +928,14 @@
                             reader.onload = () => resolve(reader.result);
                             reader.readAsDataURL(file);
                         });
-                        aiResult = await callSupabaseProxy({ image_url: base64, engine: 'vision' });
+                        // 优先级: 本地代理 > Edge Function > Vision直接
+                        if (getConfig().hasLocalProxy()) {
+                            aiResult = await callLocalProxy({ image_url: base64, engine: 'vision' });
+                        } else if (getConfig().hasProxy()) {
+                            aiResult = await callSupabaseProxy({ image_url: base64, engine: 'vision' });
+                        } else {
+                            aiResult = await callVisionAPI(base64);
+                        }
                         usedRealAI = true;
                     } else if (getConfig().hasRealAI()) {
                         const input = document.createElement('input');

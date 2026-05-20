@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>川上</title>
+    <title>川</title>
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 React 和 ReactDOM -->
@@ -526,7 +526,7 @@
                     <div className="bg-zinc-950/80 backdrop-blur-xl border-b border-water-800/20 px-4 pt-12 pb-4 flex flex-col gap-3">
                         <div className="flex justify-between items-end">
                             <div>
-                                <h1 className="text-2xl brush-title">川上</h1>
+                                <h1 className="text-2xl brush-title">川</h1>
                                 <p className="text-[10px] text-water-800/60 mt-0.5 tracking-wider">子在川上曰</p>
                             </div>
                             <button onClick={toggleHeatmap} className="text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1 text-sm">
@@ -852,16 +852,51 @@
             const [aiError, setAiError] = useState(null);
             const [showSettings, setShowSettings] = useState(false);
             const [engineStatus, setEngineStatus] = useState(getConfig().hasRealAI() ? 'live' : 'mock');
-            
+            const [scrollZone, setScrollZone] = useState('now'); // 'now' | 'past' | 'future'
+
             const feedRef = useRef(null);
             const nowMarkerRef = useRef(null);
 
-            // 滚动到 "NOW" 轴心 (仅在初次加载时)
+            // 滚动到 NOW 轴心 (仅在初次加载时)
             useEffect(() => {
                 if (nowMarkerRef.current && !selectedDate) {
                     nowMarkerRef.current.scrollIntoView({ behavior: 'auto', block: 'center' });
                 }
             }, []);
+
+            // 监听滚动位置，判断在"过去"还是"未来"
+            useEffect(() => {
+                const feed = feedRef.current;
+                if (!feed) return;
+
+                const handleScroll = () => {
+                    if (!nowMarkerRef.current) return;
+                    const nowTop = nowMarkerRef.current.offsetTop;
+                    const scrollCenter = feed.scrollTop + feed.clientHeight / 2;
+                    const threshold = 60; // 距离阈值，避免太灵敏
+
+                    if (Math.abs(scrollCenter - nowTop) < threshold) {
+                        setScrollZone('now');
+                    } else if (scrollCenter < nowTop) {
+                        setScrollZone('future'); // 看着未来，按钮在下面
+                    } else {
+                        setScrollZone('past');   // 看着过去，按钮在上面
+                    }
+                };
+
+                feed.addEventListener('scroll', handleScroll, { passive: true });
+                // 初始检测
+                setTimeout(handleScroll, 500);
+                return () => feed.removeEventListener('scroll', handleScroll);
+            }, []);
+
+            // 滚动到 NOW
+            const scrollToNow = () => {
+                if (nowMarkerRef.current) {
+                    nowMarkerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    setScrollZone('now');
+                }
+            };
 
             // 核心更新：点击日历日期 -> 寻找锚点并平滑滚动
             const handleSelectDate = (dateStr) => {
@@ -1227,11 +1262,11 @@
                             {/* 未来计划区域 (向上滑动) - 插入了日期分割线 */}
                             {renderEventsWithDateDividers(futureEvents)}
 
-                            {/* Now 轴心 — 川上，石子入水 */}
+                            {/* Now 轴心 — 川 */}
                             <div ref={nowMarkerRef} className="w-full flex items-center gap-4 py-12 opacity-90">
                                 <div className="h-px flex-1 bg-gradient-to-r from-transparent via-water-800/30 to-water-800/50"></div>
                                 <div className="ripple-marker text-xs tracking-[0.3em] text-water-300 bg-water-500/5 px-5 py-2 rounded-full border border-water-500/20 backdrop-blur-md">
-                                    川上
+                                    此时
                                 </div>
                                 <div className="h-px flex-1 bg-gradient-to-l from-transparent via-water-800/30 to-water-800/50"></div>
                             </div>
@@ -1250,6 +1285,24 @@
                         isProcessing={isProcessing}
                         engineStatus={engineStatus}
                     />
+
+                    {/* 回到此时 — 浮标按钮 */}
+                    {scrollZone !== 'now' && (
+                        <button
+                            onClick={scrollToNow}
+                            className={`absolute z-40 left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full text-xs tracking-wider
+                                bg-water-500/10 border border-water-500/20 backdrop-blur-md
+                                text-water-300 hover:text-water-100 hover:bg-water-500/20
+                                transition-all duration-300 shadow-[0_0_20px_rgba(6,182,212,0.15)]
+                                animate-in
+                                ${scrollZone === 'past'
+                                    ? 'top-32'
+                                    : 'bottom-28'
+                                }`}
+                        >
+                            {scrollZone === 'past' ? '↓' : '↑'} 回到此时
+                        </button>
+                    )}
                 </div>
             );
         };

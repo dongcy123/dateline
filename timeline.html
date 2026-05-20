@@ -44,6 +44,15 @@
             box-shadow: 0 0 15px rgba(59, 130, 246, 0.3);
             border-color: rgba(59, 130, 246, 0.6);
         }
+
+        /* Toast 淡入动画 */
+        @keyframes toastIn {
+            from { opacity: 0; transform: translate(-50%, -12px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+        .animate-in {
+            animation: toastIn 0.3s ease-out;
+        }
     </style>
 </head>
 <body class="bg-zinc-950 text-zinc-100 h-screen w-screen overflow-hidden font-sans selection:bg-blue-500/30">
@@ -141,13 +150,146 @@
 
         const initialEvents = generateMockEvents();
 
-        // 模拟大模型提取 (文本意图)
+        // ==========================================
+        // API 密钥管理与配置
+        // ==========================================
+        const getConfig = () => {
+            // URL 参数优先 (方便分享和快速配置)
+            const params = new URLSearchParams(window.location.search);
+            const dk = params.get('dk') || params.get('deepseek_key');
+            const vk = params.get('vk') || params.get('vision_key');
+
+            if (dk) sessionStorage.setItem('deepseek_key', dk);
+            if (vk) sessionStorage.setItem('vision_key', vk);
+
+            // 清除 URL 参数，保护密钥
+            if (dk || vk) {
+                const url = new URL(window.location);
+                url.searchParams.delete('dk');
+                url.searchParams.delete('deepseek_key');
+                url.searchParams.delete('vk');
+                url.searchParams.delete('vision_key');
+                window.history.replaceState({}, '', url);
+            }
+
+            return {
+                deepseekKey: sessionStorage.getItem('deepseek_key') || '',
+                visionKey: sessionStorage.getItem('vision_key') || '',
+                visionModel: sessionStorage.getItem('vision_model') || 'qwen-vl-max',
+                visionBaseUrl: sessionStorage.getItem('vision_base_url') || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+                hasRealAI: () => !!(sessionStorage.getItem('deepseek_key') || sessionStorage.getItem('vision_key')),
+            };
+        };
+
+        const SYSTEM_PROMPT = `你是一个个人管理助手。分析用户输入并返回严格的 JSON。
+
+规则：
+1. 如果涉及金额、消费、购物 → type: "expense"，ai_metadata: {"amount": 数字, "tag": "餐饮|购物|交通|娱乐|教育|其他"}
+2. 如果是任务、待办、提醒 → type: "todo"，ai_metadata: {"task": "任务名", "priority": "high|normal|low"}
+3. 其他记录、想法、笔记 → type: "note"，ai_metadata: {"summary": "摘要"}
+
+只返回 JSON，不要任何额外文字。`;
+
+        // ==========================================
+        // 真实 AI 引擎 (文本通道 → DeepSeek)
+        // ==========================================
+        const callDeepSeekAPI = async (text) => {
+            const config = getConfig();
+            if (!config.deepseekKey) throw { code: 'api_key_missing', message: '未配置 DeepSeek API 密钥' };
+
+            const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${config.deepseekKey}`,
+                },
+                body: JSON.stringify({
+                    model: 'deepseek-chat',
+                    messages: [
+                        { role: 'system', content: SYSTEM_PROMPT },
+                        { role: 'user', content: `分析以下中文输入，判断类型并提取结构化数据：\n\n"${text}"` },
+                    ],
+                    temperature: 0.3,
+                    response_format: { type: 'json_object' },
+                }),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                if (res.status === 401) throw { code: 'api_key_invalid', message: 'DeepSeek API 密钥无效' };
+                if (res.status === 429) throw { code: 'rate_limit', message: '请求过于频繁，请稍后再试' };
+                throw { code: 'api_error', message: `DeepSeek API 错误 (${res.status}): ${errText}` };
+            }
+
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content;
+            if (!content) throw { code: 'parse_error', message: 'AI 返回为空' };
+
+            try {
+                return JSON.parse(content);
+            } catch {
+                // Vision models 可能返回 markdown 包裹的 JSON
+                const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                return JSON.parse(cleaned);
+            }
+        };
+
+        // ==========================================
+        // 真实 AI 引擎 (图像通道 → Vision 多模态模型)
+        // ==========================================
+        const callVisionAPI = async (imageBase64) => {
+            const config = getConfig();
+            if (!config.visionKey) throw { code: 'api_key_missing', message: '未配置视觉模型 API 密钥' };
+
+            const res = await fetch(`${config.visionBaseUrl}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${config.visionKey}`,
+                },
+                body: JSON.stringify({
+                    model: config.visionModel,
+                    messages: [
+                        { role: 'system', content: SYSTEM_PROMPT },
+                        {
+                            role: 'user',
+                            content: [
+                                { type: 'image_url', image_url: { url: imageBase64 } },
+                                { type: 'text', text: '请识别这张图片并提取结构化信息。如果是收据/小票，提取金额和分类。如果是海报/文档，提取关键信息。' },
+                            ],
+                        },
+                    ],
+                    temperature: 0.3,
+                }),
+            });
+
+            if (!res.ok) {
+                const errText = await res.text();
+                if (res.status === 401) throw { code: 'api_key_invalid', message: '视觉模型 API 密钥无效' };
+                if (res.status === 429) throw { code: 'rate_limit', message: '请求过于频繁，请稍后再试' };
+                throw { code: 'api_error', message: `视觉模型 API 错误 (${res.status}): ${errText}` };
+            }
+
+            const data = await res.json();
+            const content = data.choices?.[0]?.message?.content;
+            if (!content) throw { code: 'parse_error', message: '视觉 AI 返回为空' };
+
+            try {
+                return JSON.parse(content);
+            } catch {
+                const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                return JSON.parse(cleaned);
+            }
+        };
+
+        // ==========================================
+        // 模拟 AI (兜底方案 — 无 API 密钥时使用)
+        // ==========================================
         const mockTextAI = (text) => {
             return new Promise((resolve) => {
                 setTimeout(() => {
                     let type = 'note';
                     let ai_metadata = {};
-                    
                     if (text.includes('买') || text.includes('花') || text.includes('钱') || /\d+(\.\d+)?(元|块)/.test(text)) {
                         type = 'expense';
                         const match = text.match(/\d+(\.\d+)?/);
@@ -158,13 +300,11 @@
                     } else {
                         ai_metadata = { summary: text.substring(0, 10) + '...' };
                     }
-                    
                     resolve({ type, ai_metadata });
-                }, 800);
+                }, 600);
             });
         };
 
-        // 模拟视觉多模态大模型提取 (上传收据/海报)
         const mockVisionAI = () => {
             return new Promise((resolve) => {
                 setTimeout(() => {
@@ -172,7 +312,7 @@
                         type: 'expense',
                         ai_metadata: { amount: 128.5, tag: '购物', merchant: '苹果零售店 (模拟图片识别)' }
                     });
-                }, 1500);
+                }, 1200);
             });
         };
 
@@ -520,7 +660,7 @@
             );
         };
 
-        const Omnibox = ({ onSubmitText, onSimulateVision, isProcessing }) => {
+        const Omnibox = ({ onSubmitText, onSimulateVision, isProcessing, engineStatus }) => {
             const [text, setText] = useState('');
 
             const handleSubmit = (e) => {
@@ -549,7 +689,7 @@
                             type="text" 
                             value={text}
                             onChange={(e) => setText(e.target.value)}
-                            placeholder={isProcessing ? "AI 引擎处理中..." : "输入记录或指令..."}
+                            placeholder={isProcessing ? (engineStatus === 'live' ? "DeepSeek AI 思考中..." : "本地引擎处理中...") : (engineStatus === 'live' ? "输入记录或指令... ⚡DeepSeek" : "输入记录或指令... (模拟引擎)")}
                             disabled={isProcessing}
                             className="flex-1 bg-transparent border-none outline-none text-sm px-2 text-zinc-100 placeholder:text-zinc-600 disabled:opacity-50"
                         />
@@ -580,6 +720,9 @@
             const [isHeatmapOpen, setIsHeatmapOpen] = useState(false);
             const [isProcessing, setIsProcessing] = useState(false);
             const [selectedDate, setSelectedDate] = useState(null);
+            const [aiError, setAiError] = useState(null);
+            const [showSettings, setShowSettings] = useState(false);
+            const [engineStatus, setEngineStatus] = useState(getConfig().hasRealAI() ? 'live' : 'mock');
             
             const feedRef = useRef(null);
             const nowMarkerRef = useRef(null);
@@ -658,25 +801,40 @@
                 });
             };
 
-            // 模拟发送文本给 DeepSeek AI
+            // 发送文本给 AI (真实引擎 → 模拟引擎兜底)
             const handleTextSubmit = async (text) => {
                 setIsProcessing(true);
-                const aiResult = await mockTextAI(text);
-                
+                let aiResult;
+                let usedRealAI = false;
+
+                try {
+                    if (getConfig().hasRealAI()) {
+                        aiResult = await callDeepSeekAPI(text);
+                        usedRealAI = true;
+                    } else {
+                        aiResult = await mockTextAI(text);
+                    }
+                } catch (err) {
+                    console.error('[AI Error]', err);
+                    setAiError({ message: err.message || 'AI 调用失败', code: err.code || 'unknown' });
+                    // 降级到模拟 AI
+                    aiResult = await mockTextAI(text);
+                    setAiError(prev => prev ? { ...prev, fallback: '已降级到本地模拟引擎' } : null);
+                }
+
                 const newEvent = {
                     id: generateId(),
-                    timeline_time: new Date().toISOString(), // 默认放当前时间
+                    timeline_time: new Date().toISOString(),
                     record_time: new Date().toISOString(),
                     raw_content: text,
                     type: aiResult.type,
-                    status: 'pending', // AI 生成的默认为 pending
-                    ai_metadata: aiResult.ai_metadata
+                    status: 'pending',
+                    ai_metadata: { ...aiResult.ai_metadata, _engine: usedRealAI ? 'deepseek' : 'mock' }
                 };
-                
+
                 setEvents(prev => [newEvent, ...prev]);
                 setIsProcessing(false);
-                
-                // 延迟一下滚动，确保渲染完成
+
                 setTimeout(() => {
                     if (nowMarkerRef.current) {
                         nowMarkerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -684,11 +842,48 @@
                 }, 100);
             };
 
-            // 模拟拍照发送给视觉大模型 (Qwen-VL)
+            // 拍照发送给视觉大模型 (真实引擎 → 模拟引擎兜底)
             const handleVisionSubmit = async () => {
                 setIsProcessing(true);
-                const aiResult = await mockVisionAI();
-                
+                let aiResult;
+                let usedRealAI = false;
+
+                try {
+                    if (getConfig().hasRealAI()) {
+                        // 创建文件选择器
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+
+                        const file = await new Promise((resolve) => {
+                            input.onchange = (e) => resolve(e.target.files[0]);
+                            input.oncancel = () => resolve(null);
+                            input.click();
+                        });
+
+                        if (file) {
+                            // 转 base64
+                            const base64 = await new Promise((resolve) => {
+                                const reader = new FileReader();
+                                reader.onload = () => resolve(reader.result);
+                                reader.readAsDataURL(file);
+                            });
+                            aiResult = await callVisionAPI(base64);
+                            usedRealAI = true;
+                        } else {
+                            setIsProcessing(false);
+                            return; // 用户取消选择
+                        }
+                    } else {
+                        aiResult = await mockVisionAI();
+                    }
+                } catch (err) {
+                    console.error('[Vision AI Error]', err);
+                    setAiError({ message: err.message || '视觉 AI 调用失败', code: err.code || 'unknown' });
+                    aiResult = await mockVisionAI();
+                    setAiError(prev => prev ? { ...prev, fallback: '已降级到本地模拟引擎' } : null);
+                }
+
                 const newEvent = {
                     id: generateId(),
                     timeline_time: new Date().toISOString(),
@@ -696,9 +891,9 @@
                     raw_content: "[图片凭证已上传 - AI解析]",
                     type: aiResult.type,
                     status: 'pending',
-                    ai_metadata: aiResult.ai_metadata
+                    ai_metadata: { ...aiResult.ai_metadata, _engine: usedRealAI ? 'vision' : 'mock' }
                 };
-                
+
                 setEvents(prev => [newEvent, ...prev]);
                 setIsProcessing(false);
             };
@@ -723,7 +918,109 @@
                 <div className="relative h-full w-full flex flex-col">
                     {/* 背景层 */}
                     <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-zinc-900/20 via-zinc-950 to-zinc-950 z-0"></div>
-                    
+
+                    {/* AI 引擎状态指示器 */}
+                    <div className="absolute top-4 right-4 z-[60] flex items-center gap-2">
+                        <button
+                            onClick={() => setShowSettings(!showSettings)}
+                            className={`text-[10px] px-2 py-1 rounded-full border transition-all ${
+                                engineStatus === 'live'
+                                    ? 'bg-green-500/10 border-green-500/30 text-green-400'
+                                    : 'bg-zinc-800 border-zinc-700 text-zinc-500'
+                            }`}
+                        >
+                            {engineStatus === 'live' ? '⚡ AI 在线' : '🔸 模拟引擎'}
+                        </button>
+                    </div>
+
+                    {/* API 密钥设置面板 */}
+                    {showSettings && (
+                        <div className="absolute top-12 right-4 z-[70] w-80 bg-zinc-900 border border-zinc-700 rounded-2xl p-5 shadow-2xl backdrop-blur-xl">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-sm font-semibold text-zinc-200">AI 引擎配置</h3>
+                                <button onClick={() => setShowSettings(false)} className="text-zinc-500 hover:text-zinc-300 text-lg">&times;</button>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-[10px] text-zinc-500 mb-1 block">DeepSeek API Key (文本引擎)</label>
+                                    <input
+                                        type="password"
+                                        defaultValue={getConfig().deepseekKey}
+                                        onChange={(e) => {
+                                            sessionStorage.setItem('deepseek_key', e.target.value);
+                                            setEngineStatus(getConfig().hasRealAI() ? 'live' : 'mock');
+                                        }}
+                                        placeholder="sk-..."
+                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-zinc-500 mb-1 block">Vision API Key (图像引擎)</label>
+                                    <input
+                                        type="password"
+                                        defaultValue={getConfig().visionKey}
+                                        onChange={(e) => {
+                                            sessionStorage.setItem('vision_key', e.target.value);
+                                            setEngineStatus(getConfig().hasRealAI() ? 'live' : 'mock');
+                                        }}
+                                        placeholder="视觉模型 API Key..."
+                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-zinc-500 mb-1 block">Vision Base URL</label>
+                                    <input
+                                        type="text"
+                                        defaultValue={getConfig().visionBaseUrl}
+                                        onChange={(e) => sessionStorage.setItem('vision_base_url', e.target.value)}
+                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-zinc-500 mb-1 block">Vision Model</label>
+                                    <select
+                                        defaultValue={getConfig().visionModel}
+                                        onChange={(e) => sessionStorage.setItem('vision_model', e.target.value)}
+                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                                    >
+                                        <option value="qwen-vl-max">Qwen-VL Max</option>
+                                        <option value="qwen-vl-plus">Qwen-VL Plus</option>
+                                        <option value="moonshot-v1-8k">Kimi (Moonshot)</option>
+                                        <option value="gpt-4o">GPT-4o</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <p className="text-[10px] text-zinc-600 mt-4 leading-relaxed">
+                                密钥仅存储在浏览器 sessionStorage 中，不会被上传到任何服务器。
+                                关闭标签页后自动清除。也可通过 URL 参数传入：
+                                <code className="text-zinc-500 block mt-1">?dk=sk-xxx&vk=yyy</code>
+                            </p>
+                        </div>
+                    )}
+
+                    {/* AI 错误提示 Toast */}
+                    {aiError && (
+                        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[70] animate-in">
+                            <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm backdrop-blur-xl shadow-2xl max-w-sm">
+                                <div className="flex items-start gap-2">
+                                    <span className="text-red-400 text-lg">⚠</span>
+                                    <div>
+                                        <p className="text-red-300 text-xs font-medium">{aiError.message}</p>
+                                        {aiError.fallback && (
+                                            <p className="text-zinc-400 text-[10px] mt-1">{aiError.fallback}</p>
+                                        )}
+                                    </div>
+                                    <button
+                                        onClick={() => setAiError(null)}
+                                        className="text-zinc-500 hover:text-zinc-300 ml-2"
+                                    >&times;</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* HUD Header */}
                     <HUDHeader 
                         budget={{remain: 3250, total: 5000}} 
@@ -762,10 +1059,11 @@
                     </div>
 
                     {/* 底部输入区 */}
-                    <Omnibox 
-                        onSubmitText={handleTextSubmit} 
+                    <Omnibox
+                        onSubmitText={handleTextSubmit}
                         onSimulateVision={handleVisionSubmit}
                         isProcessing={isProcessing}
+                        engineStatus={engineStatus}
                     />
                 </div>
             );

@@ -177,7 +177,10 @@
                 visionKey: sessionStorage.getItem('vision_key') || '',
                 visionModel: sessionStorage.getItem('vision_model') || 'qwen-vl-max',
                 visionBaseUrl: sessionStorage.getItem('vision_base_url') || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-                hasRealAI: () => !!(sessionStorage.getItem('deepseek_key') || sessionStorage.getItem('vision_key')),
+                supabaseUrl: sessionStorage.getItem('supabase_url') || '',
+                supabaseKey: sessionStorage.getItem('supabase_key') || '',
+                hasRealAI: () => !!(sessionStorage.getItem('deepseek_key') || sessionStorage.getItem('vision_key') || sessionStorage.getItem('supabase_url')),
+                hasProxy: () => !!(sessionStorage.getItem('supabase_url') && sessionStorage.getItem('supabase_key')),
             };
         };
 
@@ -280,6 +283,33 @@
                 const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
                 return JSON.parse(cleaned);
             }
+        };
+
+        // ==========================================
+        // Supabase Edge Function Proxy (推荐路径 — 密钥安全)
+        // ==========================================
+        const callSupabaseProxy = async (request) => {
+            const config = getConfig();
+            const url = `${config.supabaseUrl}/functions/v1/ai-proxy`;
+
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${config.supabaseKey}`,
+                },
+                body: JSON.stringify(request),
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw {
+                    code: err.error?.code || 'api_error',
+                    message: err.error?.message || `Edge Function 错误 (${res.status})`,
+                };
+            }
+
+            return res.json();
         };
 
         // ==========================================
@@ -808,7 +838,10 @@
                 let usedRealAI = false;
 
                 try {
-                    if (getConfig().hasRealAI()) {
+                    if (getConfig().hasProxy()) {
+                        aiResult = await callSupabaseProxy({ text, engine: 'text' });
+                        usedRealAI = true;
+                    } else if (getConfig().hasRealAI()) {
                         aiResult = await callDeepSeekAPI(text);
                         usedRealAI = true;
                     } else {
@@ -829,7 +862,7 @@
                     raw_content: text,
                     type: aiResult.type,
                     status: 'pending',
-                    ai_metadata: { ...aiResult.ai_metadata, _engine: usedRealAI ? 'deepseek' : 'mock' }
+                    ai_metadata: { ...aiResult.ai_metadata, _engine: getConfig().hasProxy() ? 'supabase-proxy' : (usedRealAI ? 'deepseek' : 'mock') }
                 };
 
                 setEvents(prev => [newEvent, ...prev]);
@@ -849,20 +882,34 @@
                 let usedRealAI = false;
 
                 try {
-                    if (getConfig().hasRealAI()) {
-                        // 创建文件选择器
+                    if (getConfig().hasProxy()) {
+                        // Edge Function proxy with file picker
                         const input = document.createElement('input');
                         input.type = 'file';
                         input.accept = 'image/*';
-
                         const file = await new Promise((resolve) => {
                             input.onchange = (e) => resolve(e.target.files[0]);
                             input.oncancel = () => resolve(null);
                             input.click();
                         });
-
+                        if (!file) { setIsProcessing(false); return; }
+                        const base64 = await new Promise((resolve) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(reader.result);
+                            reader.readAsDataURL(file);
+                        });
+                        aiResult = await callSupabaseProxy({ image_url: base64, engine: 'vision' });
+                        usedRealAI = true;
+                    } else if (getConfig().hasRealAI()) {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        const file = await new Promise((resolve) => {
+                            input.onchange = (e) => resolve(e.target.files[0]);
+                            input.oncancel = () => resolve(null);
+                            input.click();
+                        });
                         if (file) {
-                            // 转 base64
                             const base64 = await new Promise((resolve) => {
                                 const reader = new FileReader();
                                 reader.onload = () => resolve(reader.result);
@@ -872,7 +919,7 @@
                             usedRealAI = true;
                         } else {
                             setIsProcessing(false);
-                            return; // 用户取消选择
+                            return;
                         }
                     } else {
                         aiResult = await mockVisionAI();
@@ -891,7 +938,7 @@
                     raw_content: "[图片凭证已上传 - AI解析]",
                     type: aiResult.type,
                     status: 'pending',
-                    ai_metadata: { ...aiResult.ai_metadata, _engine: usedRealAI ? 'vision' : 'mock' }
+                    ai_metadata: { ...aiResult.ai_metadata, _engine: getConfig().hasProxy() ? 'supabase-proxy' : (usedRealAI ? 'vision' : 'mock') }
                 };
 
                 setEvents(prev => [newEvent, ...prev]);
@@ -942,6 +989,35 @@
                             </div>
 
                             <div className="space-y-3">
+                                <div className="bg-blue-500/5 border border-blue-500/10 rounded-lg p-3 mb-1">
+                                    <label className="text-[10px] text-blue-400 mb-1 block font-medium">推荐：Supabase Edge Function Proxy</label>
+                                    <p className="text-[10px] text-zinc-500 mb-2">密钥存储在服务端，更安全。需要部署 Edge Function。</p>
+                                    <input
+                                        type="text"
+                                        defaultValue={getConfig().supabaseUrl}
+                                        onChange={(e) => {
+                                            sessionStorage.setItem('supabase_url', e.target.value);
+                                            setEngineStatus(getConfig().hasRealAI() ? 'live' : 'mock');
+                                        }}
+                                        placeholder="https://xxx.supabase.co"
+                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 outline-none focus:border-blue-500 mb-1"
+                                    />
+                                    <input
+                                        type="password"
+                                        defaultValue={getConfig().supabaseKey}
+                                        onChange={(e) => {
+                                            sessionStorage.setItem('supabase_key', e.target.value);
+                                            setEngineStatus(getConfig().hasRealAI() ? 'live' : 'mock');
+                                        }}
+                                        placeholder="anon key"
+                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 outline-none focus:border-blue-500"
+                                    />
+                                </div>
+
+                                <div className="border-t border-zinc-800 pt-3">
+                                    <label className="text-[10px] text-zinc-500 mb-2 block">或者直接配置 API 密钥：</label>
+                                </div>
+
                                 <div>
                                     <label className="text-[10px] text-zinc-500 mb-1 block">DeepSeek API Key (文本引擎)</label>
                                     <input

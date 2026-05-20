@@ -450,11 +450,11 @@
                         <div className="flex gap-4 items-center">
                             <div className="flex-1 flex flex-col gap-1.5">
                                 <div className="flex justify-between text-xs text-zinc-500 font-medium">
-                                    <span>预算池</span>
-                                    <span className="text-white/70">¥{budget.remain} / {budget.total}</span>
+                                    <span>本月预算</span>
+                                    <span className="text-white/70">¥{budget.spent} / {budget.total}</span>
                                 </div>
                                 <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-gradient-to-r from-white/50 to-white/30 rounded-full" style={{width: `${(budget.remain/budget.total)*100}%`}}></div>
+                                    <div className="h-full bg-gradient-to-r from-orange-400/60 to-orange-400/30 rounded-full transition-all duration-500" style={{width: `${budget.total ? (budget.spent/budget.total)*100 : 0}%`}}></div>
                                 </div>
                             </div>
                             <div className="flex-1 flex flex-col gap-1.5">
@@ -463,7 +463,7 @@
                                     <span className="text-white/70">{exp.done} / {exp.total}</span>
                                 </div>
                                 <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-gradient-to-r from-white/40 to-white/20 rounded-full" style={{width: `${(exp.done/exp.total)*100}%`}}></div>
+                                    <div className="h-full bg-gradient-to-r from-blue-400/60 to-blue-400/30 rounded-full transition-all duration-500" style={{width: `${exp.total ? (exp.done/exp.total)*100 : 0}%`}}></div>
                                 </div>
                             </div>
                         </div>
@@ -849,10 +849,39 @@
             const sortedEvents = useMemo(() => {
                 return [...events].sort((a, b) => new Date(b.timeline_time) - new Date(a.timeline_time));
             }, [events]);
-            
+
             const now = new Date();
             const futureEvents = sortedEvents.filter(e => new Date(e.timeline_time) > now);
             const pastEvents = sortedEvents.filter(e => new Date(e.timeline_time) <= now);
+
+            // 从真实数据计算预算池（本月支出）
+            const budget = useMemo(() => {
+                const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+                const monthExpenses = events
+                    .filter(e => e.type === 'expense' && new Date(e.timeline_time) >= monthStart)
+                    .reduce((sum, e) => sum + (e.ai_metadata?.amount || 0), 0);
+                const defaultTotal = 5000;
+                return {
+                    spent: monthExpenses,
+                    remain: Math.max(0, defaultTotal - monthExpenses),
+                    total: defaultTotal,
+                };
+            }, [events, now]);
+
+            // 从真实数据计算今日任务
+            const todayTasks = useMemo(() => {
+                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+                const todayTodos = events.filter(e =>
+                    e.type === 'todo' &&
+                    new Date(e.timeline_time) >= todayStart &&
+                    new Date(e.timeline_time) < todayEnd
+                );
+                return {
+                    done: todayTodos.filter(e => e.status === 'done').length,
+                    total: todayTodos.length,
+                };
+            }, [events, now]);
 
             // 渲染列表并插入日期分割线的辅助函数 (两栏布局：左1/3支出，右2/3其余)
             const renderEventsWithDateDividers = (eventList) => {
@@ -1204,9 +1233,9 @@
                     )}
 
                     {/* HUD Header */}
-                    <HUDHeader 
-                        budget={{remain: 3250, total: 5000}} 
-                        exp={{done: 2, total: 5}} 
+                    <HUDHeader
+                        budget={budget}
+                        exp={todayTasks}
                         isHeatmapOpen={isHeatmapOpen}
                         toggleHeatmap={() => setIsHeatmapOpen(!isHeatmapOpen)}
                         events={events}

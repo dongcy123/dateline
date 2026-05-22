@@ -47,13 +47,6 @@ export default function HomeScreen() {
     [events, nowStr]
   );
 
-  const budget = useMemo(() => {
-    const spent = events
-      .filter((e) => e.type === 'expense' && e.status !== 'pending')
-      .reduce((sum, e) => sum + ((e.ai_metadata as any)?.amount || 0), 0);
-    return { remain: Math.max(5000 - spent, 0), total: 5000 };
-  }, [events]);
-
   const exp = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -202,7 +195,6 @@ export default function HomeScreen() {
 
       {/* HUD Header */}
       <HUDHeader
-        budget={budget}
         exp={exp}
         isHeatmapOpen={isHeatmapOpen}
         onToggleHeatmap={() => setIsHeatmapOpen(!isHeatmapOpen)}
@@ -253,11 +245,11 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#09090b' },
+  container: { flex: 1, backgroundColor: '#F5F0EB' },
   bg: {
     position: 'absolute',
     inset: 0,
-    backgroundColor: '#09090b',
+    backgroundColor: '#F5F0EB',
   },
   feed: { flex: 1 },
   divider: {
@@ -266,46 +258,46 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     opacity: 0.8,
   },
-  dividerLine: { flex: 1, height: 0.5, backgroundColor: 'rgba(39,39,42,0.5)' },
+  dividerLine: { flex: 1, height: 0.5, backgroundColor: 'rgba(184,181,224,0.18)' },
   dividerPill: {
-    backgroundColor: 'rgba(24,24,27,0.5)',
+    backgroundColor: 'rgba(255,255,255,0.40)',
     borderWidth: 0.5,
-    borderColor: '#27272a',
+    borderColor: 'rgba(255,255,255,0.30)',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 4,
     marginHorizontal: 16,
   },
-  dividerText: { fontSize: 10, color: '#71717a', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  dividerText: { fontSize: 10, color: '#8B84A0', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   nowMarker: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 32,
     opacity: 0.9,
   },
-  nowLine: { flex: 1, height: 0.5, backgroundColor: '#3f3f46' },
+  nowLine: { flex: 1, height: 0.5, backgroundColor: 'rgba(184,181,224,0.25)' },
   nowPill: {
-    backgroundColor: 'rgba(59,130,246,0.1)',
+    backgroundColor: 'rgba(184,181,224,0.12)',
     borderWidth: 0.5,
-    borderColor: 'rgba(59,130,246,0.3)',
+    borderColor: 'rgba(184,181,224,0.3)',
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 6,
     marginHorizontal: 16,
-    shadowColor: '#3b82f6',
-    shadowOpacity: 0.2,
+    shadowColor: '#8B7FB8',
+    shadowOpacity: 0.15,
     shadowRadius: 10,
   },
   nowText: {
     fontSize: 12,
-    color: '#60a5fa',
+    color: '#8B7FB8',
     fontWeight: '600',
     letterSpacing: 4,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   empty: { alignItems: 'center', paddingVertical: 80 },
-  emptyText: { color: '#71717a', fontSize: 15 },
-  emptySubtext: { color: '#52525b', fontSize: 13, marginTop: 4 },
+  emptyText: { color: '#8B84A0', fontSize: 15 },
+  emptySubtext: { color: '#8B84A0', fontSize: 13, marginTop: 4 },
   footer: { alignItems: 'center', paddingVertical: 40 },
-  footerText: { color: '#3f3f46', fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  footerText: { color: '#8B84A0', fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
 });

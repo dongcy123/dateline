@@ -4,1546 +4,850 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>川上</title>
-    <!-- 引入 Tailwind CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入 React 和 ReactDOM (本地托管，避免 CDN 被拦截) -->
-    <script src="/static/react.js"></script>
-    <script src="/static/react-dom.js"></script>
-    <!-- 引入 Babel 编译 JSX -->
-    <script src="/static/babel.js"></script>
-    <!-- 引入 Supabase JS SDK -->
-    <script src="/static/supabase.js"></script>
-
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        zinc: {
-                            900: '#18181b',
-                            950: '#09090b',
-                        },
-                    },
-                    animation: {
-                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'ripple': 'ripple 3s ease-out infinite',
-                        'shimmer': 'shimmer 4s ease-in-out infinite',
-                    },
-                    keyframes: {
-                        ripple: {
-                            '0%':   { boxShadow: '0 0 0 0px rgba(168,85,247,0.25), 0 0 0 0px rgba(96,165,250,0.15), 0 0 0 0px rgba(251,146,60,0.15)' },
-                            '50%':  { boxShadow: '0 0 0 6px rgba(168,85,247,0), 0 0 0 14px rgba(96,165,250,0), 0 0 0 14px rgba(251,146,60,0)' },
-                            '100%': { boxShadow: '0 0 0 0px rgba(168,85,247,0), 0 0 0 0px rgba(96,165,250,0), 0 0 0 0px rgba(251,146,60,0)' },
-                        },
-                        shimmer: {
-                            '0%, 100%': { opacity: '0.4' },
-                            '50%':      { opacity: '0.8' },
-                        },
-                    },
-                }
-            }
-        }
-    </script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2/umd/supabase.min.js"></script>
+    <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','Noto Sans SC','PingFang SC','sans-serif']},colors:{beige:{50:'#FCF9F6',100:'#F5F0EB',200:'#EDE7E0',300:'#E8E0D8'},lavender:{100:'#E8E4F4',200:'#D4CEE8',300:'#B8B5E0',400:'#A89FCD',500:'#8B7FB8',600:'#6B5E9A'}},animation:{'fade-in':'fadeIn 0.3s ease-out','slide-down':'slideDown 0.3s ease-out','shimmer':'shimmer 2s ease-in-out infinite','pulse-glow':'pulseGlow 2s ease-in-out infinite','float':'float 6s ease-in-out infinite'},keyframes:{fadeIn:{'0%':{opacity:'0'},'100%':{opacity:'1'}},slideDown:{'0%':{opacity:'0',transform:'translateY(-6px)'},'100%':{opacity:'1',transform:'translateY(0)'}},shimmer:{'0%,100%':{opacity:'0.4'},'50%':{opacity:'0.8'}},pulseGlow:{'0%,100%':{boxShadow:'0 0 0 0 rgba(184,181,224,0.4)'},'50%':{boxShadow:'0 0 0 8px rgba(184,181,224,0)'}},float:{'0%,100%':{transform:'translateY(0px)'},'50%':{transform:'translateY(-8px)'}}}}}}</script>
     <style>
-        /* 隐藏滚动条但保持可滚动 */
-        .no-scrollbar::-webkit-scrollbar {
-            display: none;
+        :root {
+            --bg-primary: #F5F0EB;
+            --bg-secondary: #EDE7E0;
+            --bg-tertiary: #E8E0D8;
+            --accent-100: #E8E4F4;
+            --accent-200: #D4CEE8;
+            --accent-300: #B8B5E0;
+            --accent-400: #A89FCD;
+            --accent-500: #8B7FB8;
+            --accent-600: #6B5E9A;
+            --glass-bg: rgba(255,255,255,0.62);
+            --glass-bg-strong: rgba(255,255,255,0.72);
+            --glass-bg-light: rgba(255,255,255,0.38);
+            --glass-border: rgba(255,255,255,0.75);
+            --glass-border-subtle: rgba(255,255,255,0.50);
+            --glass-blur: 20px;
+            --text-primary: #2D2838;
+            --text-secondary: #5C5670;
+            --text-tertiary: #8B84A0;
+            --text-inverse: #F5F0EB;
+            --shadow-card: 0 4px 24px rgba(139,127,184,0.18), 0 1px 6px rgba(139,127,184,0.08), 0 0 0 1px rgba(184,181,224,0.10);
+            --shadow-card-hover: 0 8px 40px rgba(139,127,184,0.25), 0 2px 10px rgba(139,127,184,0.12), 0 0 0 1px rgba(184,181,224,0.20);
+            --shadow-header: 0 2px 20px rgba(139,127,184,0.10), 0 0 0 1px rgba(184,181,224,0.08);
+            --color-success: #7EB8A0;
+            --color-error: #C48080;
         }
-        .no-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        
-        /* 川上 — 极简纯白视觉系统 */
-
-        /* 待确认卡片 */
-        .glow-pending {
-            box-shadow: 0 0 16px rgba(255, 255, 255, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.03);
-        }
-
-        /* NOW 标记 */
-        .ripple-marker {
-            animation: ripple 3s ease-out infinite;
-        }
-
-        /* 卡片悬浮 */
-        .card-hover {
-            transition: all 0.3s ease;
-        }
-        .card-hover:hover {
-            box-shadow: 0 4px 24px rgba(255, 255, 255, 0.03);
-            transform: translateY(-1px);
-        }
-
-        /* 背景 */
-        .dark-bg {
-            background: #09090b;
-        }
-
-        /* 标题 */
-        .site-title {
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", "Helvetica Neue", sans-serif;
-            font-weight: 300;
-            letter-spacing: 0.12em;
-            color: #ffffff;
-        }
-
-        /* Toast 淡入动画 */
-        @keyframes toastIn {
-            from { opacity: 0; transform: translate(-50%, -12px); }
-            to { opacity: 1; transform: translate(-50%, 0); }
-        }
-        .animate-in {
-            animation: toastIn 0.3s ease-out;
-        }
+        .no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+        .beige-bg{background:var(--bg-primary)}
+        .glass{background:var(--glass-bg);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));border:1px solid var(--glass-border-subtle);box-shadow:var(--shadow-card)}
+        .glass-strong{background:var(--glass-bg-strong);backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));border:1px solid var(--glass-border)}
+        .glass-light{background:var(--glass-bg-light);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--glass-border-subtle)}
+        .flow-scroll{scroll-behavior:smooth;overscroll-behavior-y:contain}
+        .grain::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opacity:0.035;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+        @keyframes toastIn{from{opacity:0;transform:translate(-50%,-12px)}to{opacity:1;transform:translate(-50%,0)}}
+        .animate-in{animation:toastIn .3s ease-out}
+        .card-right{margin-left:8px;transform:rotate(0.8deg)}
+        .card-left{margin-right:8px;transform:rotate(-0.8deg)}
     </style>
 </head>
-<body class="bg-zinc-950 text-zinc-100 h-screen w-screen overflow-hidden font-sans selection:bg-white/30">
-    <div id="root" class="h-full w-full"></div>
-    <div id="fallback" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:red;z-index:9999;font-size:20px;">React 未加载 — 请检查控制台 (F12)</div>
+<body class="h-screen w-screen overflow-hidden font-sans selection:bg-lavender-200/40 grain" style="background:var(--bg-primary);color:var(--text-primary)">
+<div id="root" class="h-full w-full"></div>
+<div id="fallback" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);color:red;z-index:9999;font-size:20px">React 未加载</div>
 
-    <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+<script type="text/babel">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-        // 图标组件 (使用原生 SVG 替代外部库以确保稳定性)
-        const Icons = {
-            Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
-            Mic: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line></svg>,
-            Check: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>,
-            ChevronDown: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>,
-            Camera: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>,
-            Send: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>,
-            Coffee: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></svg>,
-            Briefcase: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>,
-            FileText: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>,
-            Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+// ==========================================
+// 目标色板
+// ==========================================
+const OBJ_PALETTE = [
+    '#8B7FB8','#A89FCD','#C48080','#7EB8A0','#B8A080','#8090B8','#A080B0','#6B5E9A',
+    '#9B8FC0','#C89090','#88B8A8','#B89088','#8898B8','#9888B0','#7B6EA0',
+];
+const TYPE_LABELS = { todo:'待办', note:'笔记' };
+
+// ==========================================
+// 工具
+// ==========================================
+const uid = () => window.crypto?.randomUUID?.() || Math.random().toString(36).substr(2,9)+Date.now().toString(36);
+const fmtTime = d => new Intl.DateTimeFormat('zh-CN',{hour:'2-digit',minute:'2-digit'}).format(d);
+const fmtDate = d => new Intl.DateTimeFormat('zh-CN',{month:'short',day:'numeric'}).format(d);
+const tsDay = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const todayStr = () => tsDay(new Date());
+
+// ==========================================
+// 存储: Supabase + localStorage 双写
+// ==========================================
+const EV_KEY = 'kw_events_v3', OBJ_KEY = 'kw_obj_v3';
+const load = k => { try { const r=localStorage.getItem(k); return r?JSON.parse(r):null; }catch{ return null; } };
+const save = (k,v) => { try { localStorage.setItem(k,JSON.stringify(v)); }catch{} };
+
+// Supabase 客户端
+const SB_URL = 'https://gduqrtzoggpjyifxvzxy.supabase.co';
+const SB_KEY = 'sb_publishable_8q1OXyDCIo6wcn82ReOa4w_-3azo0lH';
+let sb = null;
+try {
+    if (typeof supabase !== 'undefined' && supabase.createClient) {
+        sb = supabase.createClient(SB_URL, SB_KEY);
+        console.log('[Supabase] connected');
+    }
+} catch(e) { console.log('[Supabase] not available, using localStorage only'); }
+
+// 从 Supabase 加载数据
+const loadFromSB = async () => {
+    if (!sb) return null;
+    try {
+        const [evRes, objRes] = await Promise.all([
+            sb.from('timeline_events').select('*').order('timeline_time', { ascending: false }),
+            sb.from('objectives').select('*').order('created_at', { ascending: true })
+        ]);
+        if (evRes.error) console.warn('[SB] events:', evRes.error.message);
+        if (objRes.error) console.warn('[SB] objectives:', objRes.error.message);
+        return {
+            events: evRes.data || [],
+            objectives: objRes.data || []
         };
+    } catch(e) {
+        console.warn('[SB] load error:', e.message);
+        return null;
+    }
+};
 
-        const generateId = () => {
-            if (window.crypto && window.crypto.randomUUID) {
-                return window.crypto.randomUUID();
+// 写入事件到 Supabase
+const saveEventToSB = async (ev) => {
+    if (!sb) return;
+    try {
+        const { error } = await sb.from('timeline_events').upsert({
+            id: ev.id,
+            timeline_time: ev.timeline_time,
+            record_time: ev.record_time,
+            raw_content: ev.raw_content,
+            type: ev.type,
+            status: ev.status,
+            objective_id: ev.objective_id || null,
+            ai_metadata: ev.ai_metadata || {}
+        });
+        if (error) console.warn('[SB] save event:', error.message);
+    } catch(e) { console.warn('[SB] save event error:', e.message); }
+};
+
+// 删除事件从 Supabase
+const deleteEventFromSB = async (id) => {
+    if (!sb) return;
+    try {
+        const { error } = await sb.from('timeline_events').delete().eq('id', id);
+        if (error) console.warn('[SB] delete event:', error.message);
+    } catch(e) { console.warn('[SB] delete event error:', e.message); }
+};
+
+// 写入目标到 Supabase
+const saveObjToSB = async (obj) => {
+    if (!sb) return;
+    try {
+        const { error } = await sb.from('objectives').upsert({
+            id: obj.id,
+            title: obj.title,
+            target: obj.target,
+            current: obj.current,
+            color: obj.color
+        });
+        if (error) console.warn('[SB] save obj:', error.message);
+    } catch(e) { console.warn('[SB] save obj error:', e.message); }
+};
+
+// 删除目标从 Supabase
+const deleteObjFromSB = async (id) => {
+    if (!sb) return;
+    try {
+        const { error } = await sb.from('objectives').delete().eq('id', id);
+        if (error) console.warn('[SB] delete obj:', error.message);
+    } catch(e) { console.warn('[SB] delete obj error:', e.message); }
+};
+
+const MOCK_OBJS = [
+    { id:'obj-1', title:'多模态知识图谱构建', target:300, current:120, color:'#8B7FB8' },
+    { id:'obj-2', title:'跨文化教案开发',       target:5,   current:3,   color:'#C48080' },
+    { id:'obj-3', title:'全栈产品原型迭代',     target:12,  current:7,   color:'#7EB8A0' },
+    { id:'obj-4', title:'深度学习论文精读',     target:20,  current:8,   color:'#8090B8' },
+    { id:'obj-5', title:'个人品牌内容输出',     target:30,  current:5,   color:'#B8A080' },
+];
+
+// 生成相对时间的辅助函数
+const relTime = (daysAgo, hour, minute=0) => {
+    const d = new Date();
+    d.setDate(d.getDate() - daysAgo);
+    d.setHours(hour, minute, 0, 0);
+    return d.toISOString();
+};
+
+const MOCK_EVENTS = [
+    // 今天
+    { id:'ev-01', timeline_time: relTime(0,9,30),  record_time: relTime(0,9,30),  raw_content:'整理知识图谱的实体对齐模块，标注了 50 组跨语言实体对', type:'todo', status:'done', objective_id:'obj-1', ai_metadata:{task:'实体对齐标注',progress_delta:50,tags:['标注','知识图谱']} },
+    { id:'ev-02', timeline_time: relTime(0,10,15), record_time: relTime(0,10,15), raw_content:'上午完成了 Neo4j 图数据库的 schema 设计初稿', type:'note', status:'done', objective_id:'obj-1', ai_metadata:{task:'Schema 设计',tags:['数据库','架构']} },
+    { id:'ev-03', timeline_time: relTime(0,14,0),  record_time: relTime(0,14,0),  raw_content:'写完第三章跨文化教学案例分析，涉及中德课堂对比', type:'todo', status:'done', objective_id:'obj-2', ai_metadata:{task:'第三章撰写',progress_delta:1,tags:['写作','教案']} },
+    { id:'ev-04', timeline_time: relTime(0,16,20), record_time: relTime(0,16,20), raw_content:'原型 v3.2 部署到测试环境，修复了时间轴滚动性能问题', type:'todo', status:'done', objective_id:'obj-3', ai_metadata:{task:'部署 v3.2',progress_delta:1,tags:['部署','性能']} },
+    { id:'ev-05', timeline_time: relTime(0,19,0),  record_time: relTime(0,19,0),  raw_content:'阅读《Attention Is All You Need》第三章，重点理解多头注意力机制的数学推导', type:'note', status:'done', objective_id:'obj-4', ai_metadata:{task:'论文阅读',progress_delta:1,tags:['深度学习','Transformer']} },
+    // 昨天
+    { id:'ev-06', timeline_time: relTime(1,8,45),  record_time: relTime(1,8,45),  raw_content:'梳理了目前三个数据源的实体类型，准备做 ontology 映射', type:'todo', status:'done', objective_id:'obj-1', ai_metadata:{task:'实体类型梳理',progress_delta:0,tags:['数据工程']} },
+    { id:'ev-07', timeline_time: relTime(1,11,0),  record_time: relTime(1,11,0),  raw_content:'写了两篇小红书初稿，主题是「AI 时代的个人知识管理」', type:'todo', status:'done', objective_id:'obj-5', ai_metadata:{task:'内容撰写',progress_delta:2,tags:['写作','自媒体']} },
+    { id:'ev-08', timeline_time: relTime(1,15,30), record_time: relTime(1,15,30), raw_content:'用 Figma 重新设计了设置页面的交互流程', type:'note', status:'done', objective_id:'obj-3', ai_metadata:{task:'设计迭代',tags:['Figma','UX']} },
+    { id:'ev-09', timeline_time: relTime(1,20,0),  record_time: relTime(1,20,0),  raw_content:'德国教案第二部分需要补充跨文化沟通的实际场景练习', type:'todo', status:'pending', objective_id:'obj-2', ai_metadata:{task:'教案补充',progress_delta:0,tags:['教案','待办']} },
+    // 前天
+    { id:'ev-10', timeline_time: relTime(2,9,0),   record_time: relTime(2,9,0),   raw_content:'整理了知识图谱可视化方案的竞品分析，输出了一份对比文档', type:'note', status:'done', objective_id:'obj-1', ai_metadata:{task:'竞品分析',tags:['调研','可视化']} },
+    { id:'ev-11', timeline_time: relTime(2,14,0),  record_time: relTime(2,14,0),  raw_content:'读完了 DeepSeek-V3 技术报告，对 MoE 架构有了新的理解', type:'note', status:'done', objective_id:'obj-4', ai_metadata:{task:'技术报告阅读',progress_delta:1,tags:['大模型','MoE']} },
+    { id:'ev-12', timeline_time: relTime(2,16,30), record_time: relTime(2,16,30), raw_content:'产品原型用户测试 v3，收集了 5 份反馈，主要问题集中在导航清晰度', type:'todo', status:'done', objective_id:'obj-3', ai_metadata:{task:'用户测试',progress_delta:1,tags:['测试','用户反馈']} },
+    // 3天前
+    { id:'ev-13', timeline_time: relTime(3,10,0),  record_time: relTime(3,10,0),  raw_content:'开始搭建知识图谱的向量索引，选用 Milvus 作为向量数据库', type:'note', status:'done', objective_id:'obj-1', ai_metadata:{task:'向量索引搭建',tags:['Milvus','向量']} },
+    { id:'ev-14', timeline_time: relTime(3,15,0),  record_time: relTime(3,15,0),  raw_content:'录制了一期播客大纲，主题：从零构建个人 AI 工作流', type:'todo', status:'done', objective_id:'obj-5', ai_metadata:{task:'播客大纲',progress_delta:1,tags:['播客','AI']} },
+    { id:'ev-15', timeline_time: relTime(3,18,0),  record_time: relTime(3,18,0),  raw_content:'第四章教案框架完成，重点设计互动讨论环节', type:'todo', status:'done', objective_id:'obj-2', ai_metadata:{task:'教案框架',progress_delta:1,tags:['教案']} },
+    // 5天前
+    { id:'ev-16', timeline_time: relTime(5,9,30),  record_time: relTime(5,9,30),  raw_content:'完成全栈原型 v3.0 的前端重构，从 RN 迁移到 Expo Router', type:'todo', status:'done', objective_id:'obj-3', ai_metadata:{task:'前端重构',progress_delta:1,tags:['重构','Expo']} },
+    { id:'ev-17', timeline_time: relTime(5,14,0),  record_time: relTime(5,14,0),  raw_content:'精读论文：GraphRAG — 用知识图谱增强检索增强生成', type:'note', status:'done', objective_id:'obj-4', ai_metadata:{task:'GraphRAG 论文',progress_delta:1,tags:['RAG','知识图谱']} },
+    { id:'ev-18', timeline_time: relTime(5,17,0),  record_time: relTime(5,17,0),  raw_content:'本周发布了 3 篇技术博客，后台阅读量累计 2.3k', type:'note', status:'done', objective_id:'obj-5', ai_metadata:{task:'发布统计',tags:['博客','数据']} },
+    // 一周前
+    { id:'ev-19', timeline_time: relTime(7,10,0),  record_time: relTime(7,10,0),  raw_content:'确定了知识图谱的评估指标体系：实体覆盖率、关系准确率、查询响应时间', type:'note', status:'done', objective_id:'obj-1', ai_metadata:{task:'评估指标定义',tags:['评估','指标']} },
+    { id:'ev-20', timeline_time: relTime(7,16,0),  record_time: relTime(7,16,0),  raw_content:'产品原型 v2.8 完成核心功能闭环：输入→AI解析→时间轴展示→目标关联', type:'todo', status:'done', objective_id:'obj-3', ai_metadata:{task:'核心闭环',progress_delta:1,tags:['里程碑','MVP']} },
+];
+
+// ==========================================
+// AI 引擎
+// ==========================================
+const DK_KEY = 'sk-59667e37ac864780895095182443388f';
+const AI_PROMPT = `你是《川上》个人战略执行系统的 AI 助手。分析用户输入，返回严格 JSON。
+
+类型判断:
+- todo: 待执行的行动、任务、计划
+- note: 记录、想法、观察、已完成的事
+
+输出格式:
+{"type":"todo|note","objective_id":null,"ai_metadata":{"task":"摘要","progress_delta":数字,"tags":["标签"]},"timeline_time":"ISO 8601 或 null"}
+
+progress_delta: 已完成且有数量→提取数字(如"标注10张"→10); 待做→0; 无数字→1
+如果是创建目标/标签，type="objective"，ai_metadata={"title":"目标名","color":"#hex"}
+
+时间: "下周三下午3点"→推算日期, ISO 8601格式, 无法提取则null
+只返回 JSON。`;
+
+const callAI = async (text, objectives) => {
+    try {
+        const r = await fetch('http://localhost:8765',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,engine:'text'})});
+        if(r.ok) return await r.json();
+    }catch{}
+    try {
+        const n=new Date(); const ns=`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}T${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:00+08:00`;
+        let up=`当前时间：${ns}\n\n`;
+        if(objectives?.length){ up+='可用目标:\n'; objectives.forEach(o=>up+=`- ${o.id}: "${o.title}"\n`); up+='\n'; }
+        up+=`分析以下中文输入：\n\n"${text}"`;
+        const r=await fetch('https://api.deepseek.com/v1/chat/completions',{method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${DK_KEY}`},body:JSON.stringify({model:'deepseek-chat',messages:[{role:'system',content:AI_PROMPT},{role:'user',content:up}],temperature:.3,response_format:{type:'json_object'}})});
+        if(!r.ok) throw new Error(`API ${r.status}`);
+        const d=await r.json(); const c=d.choices[0].message.content.replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+        return JSON.parse(c);
+    }catch(e){ throw e; }
+};
+
+// 中文时间解析 (AI 失败兜底)
+const parseTime = (text,ref=new Date)=>{
+    const d=new Date(ref); d.setHours(0,0,0,0);
+    if(/大后天/.test(text))d.setDate(d.getDate()+3); else if(/后天/.test(text))d.setDate(d.getDate()+2); else if(/明天/.test(text))d.setDate(d.getDate()+1);
+    const wm={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'日':0,'天':0};
+    const nw=text.match(/下周([一二三四五六日天])/); if(nw){const t=wm[nw[1]],c=d.getDay(),du=(t-c+7)%7||7;d.setDate(d.getDate()+du);}
+    const dm=text.match(/(\d{1,2})月(\d{1,2})[日号]?/); if(dm){d.setMonth(parseInt(dm[1])-1);d.setDate(parseInt(dm[2]));}
+    let h=0,m=0; const tm=text.match(/(\d{1,2})[点:：](\d{1,2})?/);
+    if(tm){h=parseInt(tm[1]);m=tm[2]?parseInt(tm[2]):0;if(/(下午|晚上)/.test(text)&&h<12)h+=12;}
+    if(/半/.test(text)&&m===0)m=30;
+    d.setHours(h,m,0,0); return d;
+};
+
+// 本地规则 (AI 不可用时)
+const localParse = text => {
+    if(/^(目标|标签)[：:]\s*(.+)/.test(text)){
+        const m=text.match(/^(目标|标签)[：:]\s*(.+)/);
+        return {type:'objective',ai_metadata:{title:m[2].trim(),color:OBJ_PALETTE[Math.floor(Math.random()*OBJ_PALETTE.length)]}};
+    }
+    const isTodo=/要|去|记得|做|完成|写|整理|准备|列出|标注/.test(text)&&!/完成了|做了|读了|跑了/.test(text);
+    return {type:isTodo?'todo':'note',objective_id:null,ai_metadata:{task:text.substring(0,30),progress_delta:isTodo?0:1,tags:[]},timeline_time:null};
+};
+
+// 关键词→目标匹配
+const matchObj = (text, objs) => { for(const o of objs){ for(const kw of o.title.split(/[\s\-\—]+/)){ if(kw.length>=2&&text.includes(kw))return o.id; } } return null; };
+
+// ==========================================
+// Icons
+// ==========================================
+const Ic = {
+    Plus: ()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+    Send: ()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>,
+    Mic: ()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/></svg>,
+    Check: ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12"/></svg>,
+    Trash: ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+    Target: ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>,
+};
+
+// ==========================================
+// HUD — 川上标题 + 3D球体OKR + 日历热力
+// ==========================================
+const HUD = ({ objectives, events, todayTodos, onAddObj, onEditObj, onDeleteObj, onFilterObj, activeFilter, selectedDate, onSelectDate, isOpen, onToggle }) => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+    const firstDay = new Date(year, month, 1).getDay();
+    const startOffset = firstDay===0?6:firstDay-1;
+
+    const dayStats = useMemo(() => {
+        const stats = {};
+        events.forEach(e => {
+            const d = new Date(e.timeline_time);
+            if (d.getFullYear()===year && d.getMonth()===month) {
+                const k = d.getDate();
+                if (!stats[k]) stats[k] = { total: 0, objs: {} };
+                stats[k].total++;
+                const oid = e.objective_id || '_none';
+                stats[k].objs[oid] = (stats[k].objs[oid]||0) + 1;
             }
-            return Math.random().toString(36).substr(2, 9);
-        };
-        const formatTime = (date) => new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit' }).format(date);
-        const formatDate = (date) => new Intl.DateTimeFormat('zh-CN', { month: 'short', day: 'numeric' }).format(date);
+        });
+        return stats;
+    }, [events, year, month]);
 
-        // ==========================================
-        // 从 localStorage 加载持久化数据
-        // ==========================================
-        const loadEvents = () => {
-            try {
-                const raw = localStorage.getItem('kawakami_events');
-                if (raw) {
-                    const data = JSON.parse(raw);
-                    if (Array.isArray(data)) return data;
-                }
-            } catch (e) {
-                console.warn('加载本地数据失败，使用空数据');
-            }
-            return [];
-        };
-        const saveEvents = (events) => {
-            try {
-                localStorage.setItem('kawakami_events', JSON.stringify(events));
-            } catch (e) {
-                console.warn('保存本地数据失败');
-            }
-        };
-        const initialEvents = loadEvents();
+    // OKR 进度球体 — 按百分比填色
+    const ObjSphere = ({ o, size = 64 }) => {
+        const pct = o.target>0 ? Math.min((o.current/o.target)*100, 100) : 0;
+        const active = activeFilter===o.id;
+        const longPressRef = useRef(null);
+        const fillColor = o.color;
+        const s = size;
 
-        // ==========================================
-        // API 密钥管理与配置
-        // ==========================================
-        const getConfig = () => {
-            // URL 参数优先 (方便分享和快速配置)
-            const params = new URLSearchParams(window.location.search);
-            const dk = params.get('dk') || params.get('deepseek_key');
-            const vk = params.get('vk') || params.get('vision_key');
+        const startPress = () => { longPressRef.current = setTimeout(() => onEditObj(o), 600); };
+        const endPress = () => { if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; } };
+        const click = () => { if (longPressRef.current) return; onFilterObj(active?null:o.id); };
 
-            if (dk) sessionStorage.setItem('deepseek_key', dk);
-            if (vk) sessionStorage.setItem('vision_key', vk);
+        // 球体底面
+        const baseBg = '#EDE7E0';
+        // 简单高光 — 左上角一点亮
+        const gloss = 'radial-gradient(circle at 35% 28%, rgba(255,255,255,0.4) 0%, transparent 50%)';
+        // 选中发光
+        const glow = active
+            ? `0 0 16px ${fillColor}55, 0 0 36px ${fillColor}20`
+            : '0 2px 10px rgba(139,127,184,0.10)';
 
-            // 清除 URL 参数，保护密钥
-            if (dk || vk) {
-                const url = new URL(window.location);
-                url.searchParams.delete('dk');
-                url.searchParams.delete('deepseek_key');
-                url.searchParams.delete('vk');
-                url.searchParams.delete('vision_key');
-                window.history.replaceState({}, '', url);
-            }
-
-            // 自动检测代理 URL：本地开发用 localhost，线上用同源 /api/proxy
-            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            const defaultProxy = isLocalhost ? 'http://localhost:8765' : (window.location.origin + '/api/proxy');
-
-            return {
-                deepseekKey: sessionStorage.getItem('deepseek_key') || '',
-                visionKey: sessionStorage.getItem('vision_key') || '',
-                visionModel: sessionStorage.getItem('vision_model') || 'qwen-vl-max',
-                visionBaseUrl: sessionStorage.getItem('vision_base_url') || 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-                supabaseUrl: sessionStorage.getItem('supabase_url') || 'https://gduqrtzoggpjyifxvzxy.supabase.co',
-                supabaseKey: sessionStorage.getItem('supabase_key') || 'sb_publishable_8q1OXyDCIo6wcn82ReOa4w_-3azo0lH',
-                proxyUrl: sessionStorage.getItem('proxy_url') || defaultProxy,
-                hasRealAI: () => !!(sessionStorage.getItem('deepseek_key') || sessionStorage.getItem('vision_key') || sessionStorage.getItem('supabase_url') || sessionStorage.getItem('proxy_url')),
-                hasProxy: () => !!(sessionStorage.getItem('supabase_url') && sessionStorage.getItem('supabase_key')),
-                hasLocalProxy: () => {
-                    // 始终优先尝试代理（本地或线上）
-                    return true;
-                },
-            };
-        };
-
-        // ==========================================
-        // Supabase 数据层
-        // ==========================================
-        let supabaseClient = null;
-
-        const getSupabase = () => {
-            if (supabaseClient) return supabaseClient;
-            const config = getConfig();
-            if (config.supabaseUrl && config.supabaseKey && window.supabase) {
-                const sb = window.supabase;
-                // UMD 可能暴露 createClient 函数或 { createClient } 对象
-                const createClient = typeof sb === 'function' ? sb : sb.createClient;
-                if (createClient) {
-                    supabaseClient = createClient(config.supabaseUrl, config.supabaseKey);
-                    console.log('[Supabase] connected');
-                }
-            }
-            return supabaseClient;
-        };
-
-        const hasBackend = () => {
-            const config = getConfig();
-            return !!(config.supabaseUrl && config.supabaseKey);
-        };
-
-        const loadFromBackend = async () => {
-            const sb = getSupabase();
-            if (!sb) return null;
-            const { data, error } = await sb
-                .from('timeline_events')
-                .select('*')
-                .order('timeline_time', { ascending: false });
-            if (error) {
-                console.error('[Supabase] load error:', error.message);
-                return null;
-            }
-            // 映射数据库字段名
-            return (data || []).map(row => ({
-                id: row.id,
-                timeline_time: row.timeline_time,
-                record_time: row.record_time,
-                raw_content: row.raw_content,
-                type: row.type,
-                status: row.status,
-                ai_metadata: row.ai_metadata || {},
-                _from_db: true,
-            }));
-        };
-
-        const saveToBackend = async (event) => {
-            const sb = getSupabase();
-            if (!sb) return;
-            const row = {
-                id: event.id,
-                timeline_time: event.timeline_time,
-                record_time: event.record_time,
-                raw_content: event.raw_content,
-                type: event.type,
-                status: event.status,
-                ai_metadata: event.ai_metadata || {},
-            };
-            const { error } = await sb.from('timeline_events').upsert(row);
-            if (error) console.error('[Supabase] save error:', error.message);
-        };
-
-        const deleteFromBackend = async (id) => {
-            const sb = getSupabase();
-            if (!sb) return;
-            const { error } = await sb.from('timeline_events').delete().eq('id', id);
-            if (error) console.error('[Supabase] delete error:', error.message);
-        };
-
-        const SYSTEM_PROMPT = `你是一个个人管理助手。分析用户输入并返回严格的 JSON。
-
-规则：
-1. 如果涉及金额、消费、购物 → type: "expense"，ai_metadata: {"amount": 数字, "tag": "餐饮|购物|交通|娱乐|教育|其他"}
-2. 如果是任务、待办、提醒 → type: "todo"，ai_metadata: {"task": "任务名", "priority": "high|normal|low"}
-3. 其他记录、想法、笔记 → type: "note"，ai_metadata: {"summary": "摘要"}
-
-只返回 JSON，不要任何额外文字。`;
-
-        // ==========================================
-        // 真实 AI 引擎 (文本通道 → DeepSeek)
-        // ==========================================
-        const callDeepSeekAPI = async (text) => {
-            const config = getConfig();
-            if (!config.deepseekKey) throw { code: 'api_key_missing', message: '未配置 DeepSeek API 密钥' };
-
-            const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${config.deepseekKey}`,
-                },
-                body: JSON.stringify({
-                    model: 'deepseek-chat',
-                    messages: [
-                        { role: 'system', content: SYSTEM_PROMPT },
-                        { role: 'user', content: `分析以下中文输入，判断类型并提取结构化数据：\n\n"${text}"` },
-                    ],
-                    temperature: 0.3,
-                    response_format: { type: 'json_object' },
-                }),
-            });
-
-            if (!res.ok) {
-                const errText = await res.text();
-                if (res.status === 401) throw { code: 'api_key_invalid', message: 'DeepSeek API 密钥无效' };
-                if (res.status === 429) throw { code: 'rate_limit', message: '请求过于频繁，请稍后再试' };
-                throw { code: 'api_error', message: `DeepSeek API 错误 (${res.status}): ${errText}` };
-            }
-
-            const data = await res.json();
-            const content = data.choices?.[0]?.message?.content;
-            if (!content) throw { code: 'parse_error', message: 'AI 返回为空' };
-
-            try {
-                return JSON.parse(content);
-            } catch {
-                // Vision models 可能返回 markdown 包裹的 JSON
-                const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-                return JSON.parse(cleaned);
-            }
-        };
-
-        // ==========================================
-        // 真实 AI 引擎 (图像通道 → Vision 多模态模型)
-        // ==========================================
-        const callVisionAPI = async (imageBase64) => {
-            const config = getConfig();
-            if (!config.visionKey) throw { code: 'api_key_missing', message: '未配置视觉模型 API 密钥' };
-
-            const res = await fetch(`${config.visionBaseUrl}/chat/completions`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${config.visionKey}`,
-                },
-                body: JSON.stringify({
-                    model: config.visionModel,
-                    messages: [
-                        { role: 'system', content: SYSTEM_PROMPT },
-                        {
-                            role: 'user',
-                            content: [
-                                { type: 'image_url', image_url: { url: imageBase64 } },
-                                { type: 'text', text: '请识别这张图片并提取结构化信息。如果是收据/小票，提取金额和分类。如果是海报/文档，提取关键信息。' },
-                            ],
-                        },
-                    ],
-                    temperature: 0.3,
-                }),
-            });
-
-            if (!res.ok) {
-                const errText = await res.text();
-                if (res.status === 401) throw { code: 'api_key_invalid', message: '视觉模型 API 密钥无效' };
-                if (res.status === 429) throw { code: 'rate_limit', message: '请求过于频繁，请稍后再试' };
-                throw { code: 'api_error', message: `视觉模型 API 错误 (${res.status}): ${errText}` };
-            }
-
-            const data = await res.json();
-            const content = data.choices?.[0]?.message?.content;
-            if (!content) throw { code: 'parse_error', message: '视觉 AI 返回为空' };
-
-            try {
-                return JSON.parse(content);
-            } catch {
-                const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-                return JSON.parse(cleaned);
-            }
-        };
-
-        // ==========================================
-        // 本地 AI 代理 (绕过 CORS — 开发环境首选)
-        // ==========================================
-        const callLocalProxy = async (request) => {
-            const config = getConfig();
-            const res = await fetch(config.proxyUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(request),
-            });
-
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw {
-                    code: err.error?.code || 'api_error',
-                    message: err.error?.message || `代理错误 (${res.status})`,
-                };
-            }
-
-            return res.json();
-        };
-
-        // ==========================================
-        // Supabase Edge Function Proxy
-        // ==========================================
-        const callSupabaseProxy = async (request) => {
-            const config = getConfig();
-            const url = `${config.supabaseUrl}/functions/v1/ai-proxy`;
-
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${config.supabaseKey}`,
-                },
-                body: JSON.stringify(request),
-            });
-
-            if (!res.ok) {
-                const err = await res.json();
-                throw {
-                    code: err.error?.code || 'api_error',
-                    message: err.error?.message || `Edge Function 错误 (${res.status})`,
-                };
-            }
-
-            return res.json();
-        };
-
-        // ==========================================
-        // 模拟 AI (兜底方案 — 无 API 密钥时使用)
-        // ==========================================
-        const mockTextAI = (text) => {
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    let type = 'note';
-                    let ai_metadata = {};
-                    if (text.includes('买') || text.includes('花') || text.includes('钱') || /\d+(\.\d+)?(元|块)/.test(text)) {
-                        type = 'expense';
-                        const match = text.match(/\d+(\.\d+)?/);
-                        ai_metadata = { amount: match ? parseFloat(match[0]) : 0, tag: '杂项' };
-                    } else if (text.includes('要') || text.includes('记得') || text.includes('去')) {
-                        type = 'todo';
-                        ai_metadata = { task: text.replace(/记得|要|去/, '').trim(), priority: text.includes('紧急') ? '高' : '普通' };
-                    } else {
-                        ai_metadata = { summary: text.substring(0, 10) + '...' };
-                    }
-                    resolve({ type, ai_metadata });
-                }, 600);
-            });
-        };
-
-        const mockVisionAI = () => {
-            return new Promise((resolve) => {
-                setTimeout(() => {
-                    resolve({
-                        type: 'expense',
-                        ai_metadata: { amount: 128.5, tag: '购物', merchant: '苹果零售店 (模拟图片识别)' }
-                    });
-                }, 1200);
-            });
-        };
-
-        const HUDHeader = ({ budget, exp, toggleHeatmap, isHeatmapOpen, events, selectedDate, onSelectDate }) => {
-            // 日历核心逻辑
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = now.getMonth();
-            const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const firstDay = new Date(year, month, 1).getDay();
-            const startOffset = firstDay === 0 ? 6 : firstDay - 1; // 周一为起始日
-
-            // 数据聚合计算 (为渲染渐变热力做准备)
-            const dayStats = useMemo(() => {
-                const stats = {};
-                events.forEach(e => {
-                    const d = new Date(e.timeline_time);
-                    if (d.getFullYear() === year && d.getMonth() === month) {
-                        const dateKey = d.getDate();
-                        if (!stats[dateKey]) stats[dateKey] = { exp: 0, todo: 0, note: 0 };
-
-                        if (e.type === 'expense') stats[dateKey].exp += (e.ai_metadata?.amount || 0);
-                        else if (e.type === 'todo') stats[dateKey].todo += 1;
-                        else if (e.type === 'note') stats[dateKey].note += 1;
-                    }
-                });
-                return stats;
-            }, [events, year, month]);
-
-            // 寻找当月最大值用于计算比例 (占比 0~1)
-            let maxExp = 0, maxTodo = 0, maxNote = 0;
-            Object.values(dayStats).forEach(s => {
-                if (s.exp > maxExp) maxExp = s.exp;
-                if (s.todo > maxTodo) maxTodo = s.todo;
-                if (s.note > maxNote) maxNote = s.note;
-            });
-
-            // 渲染日历网格
-            const renderCalendarDays = () => {
-                const cells = [];
-                // 填充上月空白
-                for(let i=0; i<startOffset; i++) cells.push(<div key={`empty-${i}`} className="opacity-0"></div>);
-
-                for(let d=1; d<=daysInMonth; d++) {
-                    const stats = dayStats[d] || { exp: 0, todo: 0, note: 0 };
-                    const wExp = maxExp ? Math.min(stats.exp / maxExp, 1) : 0;
-                    const wTodo = maxTodo ? Math.min(stats.todo / maxTodo, 1) : 0;
-                    const wNote = maxNote ? Math.min(stats.note / maxNote, 1) : 0;
-
-                    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                    const isSelected = selectedDate === dateStr;
-                    const hasData = wExp > 0 || wTodo > 0 || wNote > 0;
-
-                    // 三色主题热力图：紫(笔记) 蓝(待办) 橙(支出)
-                    const bgStyle = hasData ? {
-                        background: `
-                            radial-gradient(circle at 30% 30%, rgba(168,85,247,${wNote * 0.7}) 0%, transparent 60%),
-                            radial-gradient(circle at 70% 70%, rgba(251,146,60,${wExp * 0.7}) 0%, transparent 60%),
-                            radial-gradient(circle at 50% 50%, rgba(96,165,250,${wTodo * 0.6}) 0%, transparent 70%),
-                            #18181b
-                        `,
-                        boxShadow: isSelected
-                            ? `0 0 20px rgba(168,85,247,${0.2 + wNote * 0.3}), 0 0 20px rgba(251,146,60,${0.2 + wExp * 0.3}), 0 0 20px rgba(96,165,250,${0.2 + wTodo * 0.3})`
-                            : (hasData ? `0 0 8px rgba(168,85,247,${wNote * 0.25}), 0 0 8px rgba(251,146,60,${wExp * 0.25}), 0 0 8px rgba(96,165,250,${wTodo * 0.25})` : 'none')
-                    } : { backgroundColor: '#18181b' };
-
-                    cells.push(
-                        <div 
-                            key={d} 
-                            onClick={() => onSelectDate(dateStr)}
-                            style={bgStyle}
-                            className={`aspect-square rounded-full flex items-center justify-center text-xs cursor-pointer transition-all duration-300
-                                ${isSelected ? 'ring-2 ring-white scale-110 z-10 text-white font-bold' : 'hover:scale-110 hover:ring-1 ring-zinc-500 text-zinc-300'}
-                                ${!hasData && !isSelected ? 'opacity-50' : ''}`}
-                        >
-                            {d}
-                        </div>
-                    );
-                }
-                return cells;
-            };
-
-            return (
-                <div className="fixed top-0 left-0 right-0 z-50">
-                    {/* 半透明玻璃态 Header */}
-                    <div className="bg-zinc-950/80 backdrop-blur-xl border-b border-white/10 px-4 pt-12 pb-4 flex flex-col gap-3">
-                        <div className="flex justify-between items-end">
-                            <div>
-                                <h1 className="text-2xl site-title">川上</h1>
-                                <p className="text-[10px] text-zinc-500 mt-0.5 tracking-wider">timeline</p>
-                            </div>
-                            <button onClick={toggleHeatmap} className="text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-1 text-sm">
-                                {isHeatmapOpen ? '收起日历' : '展开日历'} <Icons.ChevronDown />
-                            </button>
-                        </div>
-
-                        {/* 状态血条 */}
-                        <div className="flex gap-4 items-center">
-                            <div className="flex-1 flex flex-col gap-1.5">
-                                <div className="flex justify-between text-xs text-zinc-500 font-medium">
-                                    <span>本月预算</span>
-                                    <span className="text-white/70">¥{budget.spent} / {budget.total}</span>
-                                </div>
-                                <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-gradient-to-r from-orange-400/60 to-orange-400/30 rounded-full transition-all duration-500" style={{width: `${budget.total ? (budget.spent/budget.total)*100 : 0}%`}}></div>
-                                </div>
-                            </div>
-                            <div className="flex-1 flex flex-col gap-1.5">
-                                <div className="flex justify-between text-xs text-zinc-500 font-medium">
-                                    <span>今日任务</span>
-                                    <span className="text-white/70">{exp.done} / {exp.total}</span>
-                                </div>
-                                <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-gradient-to-r from-blue-400/60 to-blue-400/30 rounded-full transition-all duration-500" style={{width: `${exp.total ? (exp.done/exp.total)*100 : 0}%`}}></div>
-                                </div>
-                            </div>
-                        </div>
+        return (
+            <div className="flex flex-col items-center gap-1.5 select-none"
+                onMouseDown={startPress} onMouseUp={endPress} onMouseLeave={endPress}
+                onTouchStart={startPress} onTouchEnd={endPress}
+                onClick={click}>
+                {/* 球体 */}
+                <div className="relative cursor-pointer transition-transform duration-300 hover:scale-105"
+                    style={{width:s,height:s}}>
+                    {/* 底面 */}
+                    <div className="absolute inset-0 rounded-full"
+                        style={{background:baseBg,boxShadow:glow}}/>
+                    {/* 填充 — 从底部按百分比上升 */}
+                    <div className="absolute inset-0 rounded-full overflow-hidden">
+                        <div className="absolute bottom-0 left-0 right-0 transition-all duration-800 ease-out"
+                            style={{
+                                height:`${pct}%`,
+                                backgroundColor:fillColor,
+                                opacity:0.88,
+                                borderRadius:pct>98?'50%':'0 0 50% 50%'
+                            }}/>
                     </div>
-
-                    {/* 下拉热力图 (Heatmap Calendar) */}
-                    <div className={`overflow-hidden transition-all duration-500 ease-in-out bg-zinc-900 border-b border-zinc-800 shadow-2xl ${isHeatmapOpen ? 'max-h-[400px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                        <div className="p-4">
-                            <div className="flex justify-between items-center mb-4 text-sm font-medium text-zinc-300">
-                                <span>{year}年 {month + 1}月</span>
-                                {selectedDate && (
-                                    <button onClick={() => onSelectDate(selectedDate)} className="text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-1">
-                                        <Icons.Trash /> 清除筛选
-                                    </button>
-                                )}
-                            </div>
-                            <div className="grid grid-cols-7 gap-3 mb-2 text-center text-[10px] font-medium text-zinc-500">
-                                <div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div><div>日</div>
-                            </div>
-                            <div className="grid grid-cols-7 gap-3">
-                                {renderCalendarDays()}
-                            </div>
-                        </div>
-                        {/* 图例 */}
-                        <div className="flex justify-center gap-5 px-4 pb-4 text-[10px] text-zinc-500">
-                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-purple-400 shadow-[0_0_5px_rgba(168,85,247,0.5)]"></div>笔记</div>
-                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_5px_rgba(96,165,250,0.5)]"></div>待办</div>
-                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-orange-400 shadow-[0_0_5px_rgba(251,146,60,0.5)]"></div>支出</div>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const EventCard = ({ event, onConfirm, onUpdate, onDelete }) => {
-            const [isEditing, setIsEditing] = useState(false);
-            const [editData, setEditData] = useState(event);
-
-            const isPending = event.status === 'pending';
-            const date = new Date(event.timeline_time);
-            
-            const getTypeLabel = (type) => {
-                switch(type) {
-                    case 'expense': return '支出';
-                    case 'todo': return '待办';
-                    case 'note': return '笔记';
-                    default: return type;
-                }
-            };
-
-            const getKeyLabel = (key) => {
-                const map = { amount: '金额', tag: '标签', tags: '标签', task: '任务', priority: '优先级', merchant: '商户', summary: '摘要' };
-                return map[key] || key;
-            };
-
-            const getIcon = () => {
-                switch(event.type) {
-                    case 'expense': return <Icons.Coffee />;
-                    case 'todo': return <Icons.Briefcase />;
-                    case 'note': return <Icons.FileText />;
-                    default: return <div className="w-4 h-4 rounded-full bg-zinc-700"></div>;
-                }
-            };
-
-            const getColor = () => {
-                const pendingSuffix = isPending ? ' animate-pulse' : '';
-                switch(event.type) {
-                    case 'expense': return `text-orange-300 bg-orange-500/10 border-orange-400/30${pendingSuffix}`;
-                    case 'todo':    return `text-blue-300 bg-blue-500/10 border-blue-400/30${pendingSuffix}`;
-                    case 'note':    return `text-purple-300 bg-purple-500/10 border-purple-400/30${pendingSuffix}`;
-                }
-            };
-
-            // 如果处于编辑模式
-            if (isEditing) {
-                return (
-                        <div className="mb-6 p-4 rounded-2xl border bg-zinc-900 border-zinc-700 shadow-xl w-full">
-                            <div className="flex justify-between items-center mb-4">
-                                <span className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-white/40 animate-pulse"></span>
-                                    编辑模式
-                                </span>
-                                <button onClick={() => onDelete(event.id)} className="text-red-400 hover:text-red-300 p-1.5 bg-red-500/10 rounded-lg transition-colors">
-                                    <Icons.Trash />
-                                </button>
-                            </div>
-
-                            <textarea 
-                                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm text-zinc-100 mb-3 outline-none focus:border-white/40 transition-colors resize-none h-20"
-                                value={editData.raw_content}
-                                onChange={e => setEditData({...editData, raw_content: e.target.value})}
-                                placeholder="记录内容..."
-                            />
-
-                            <div className="flex gap-2 mb-3">
-                                <select 
-                                    className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-sm text-zinc-300 outline-none focus:border-white/40"
-                                    value={editData.type}
-                                    onChange={e => setEditData({
-                                        ...editData, 
-                                        type: e.target.value, 
-                                        // 切换类型时智能重置特定的元数据模板
-                                        ai_metadata: e.target.value === 'expense' ? {amount: 0, tag: '杂项'} : 
-                                                     e.target.value === 'todo' ? {task: editData.raw_content, priority: '普通'} : {}
-                                    })}
-                                >
-                                    <option value="note">笔记</option>
-                                    <option value="todo">待办</option>
-                                    <option value="expense">支出</option>
-                                </select>
-                            </div>
-
-                            {/* 动态渲染元数据编辑字段 */}
-                            {editData.type === 'expense' && (
-                                <div className="flex gap-2 mb-3">
-                                    <div className="flex-1 flex items-center bg-zinc-950 border border-zinc-800 rounded-lg px-2 focus-within:border-white/40">
-                                        <span className="text-zinc-500 text-sm mr-1">¥</span>
-                                        <input 
-                                            type="number" 
-                                            className="w-full bg-transparent p-2 text-sm text-zinc-100 outline-none"
-                                            value={editData.ai_metadata.amount || ''}
-                                            onChange={e => setEditData({...editData, ai_metadata: {...editData.ai_metadata, amount: parseFloat(e.target.value) || 0}})}
-                                        />
-                                    </div>
-                                    <input 
-                                        type="text" 
-                                        placeholder="标签 (如: 餐饮)"
-                                        className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-sm text-zinc-100 outline-none focus:border-white/40"
-                                        value={editData.ai_metadata.tag || ''}
-                                        onChange={e => setEditData({...editData, ai_metadata: {...editData.ai_metadata, tag: e.target.value}})}
-                                    />
-                                </div>
-                            )}
-
-                            {editData.type === 'todo' && (
-                                <div className="flex gap-2 mb-3">
-                                    <select 
-                                        className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-sm text-zinc-300 outline-none focus:border-white/40"
-                                        value={editData.ai_metadata.priority || '普通'}
-                                        onChange={e => setEditData({...editData, ai_metadata: {...editData.ai_metadata, priority: e.target.value}})}
-                                    >
-                                        <option value="高">高优先级</option>
-                                        <option value="普通">普通优先级</option>
-                                        <option value="低">低优先级</option>
-                                    </select>
-                                </div>
-                            )}
-
-                            <div className="flex gap-2 mt-4">
-                                <button 
-                                    onClick={() => { onUpdate(event.id, editData); setIsEditing(false); }}
-                                    className="flex-1 bg-white/15 hover:bg-white/25 text-white text-sm font-medium py-2 rounded-xl transition-colors">
-                                    保存修改
-                                </button>
-                                <button
-                                    onClick={() => { setEditData(event); setIsEditing(false); }}
-                                    className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium py-2 rounded-xl transition-colors">
-                                    取消
-                                </button>
-                        </div>
-                    </div>
-                );
-            }
-
-            const getCardStyle = () => {
-                const base = isPending ? 'bg-zinc-900/80 glow-pending' : 'bg-zinc-900/40 card-hover';
-                const borderColor = event.type === 'expense' ? 'border-orange-400/30' :
-                                    event.type === 'todo'    ? 'border-blue-400/30' :
-                                                              'border-purple-400/30';
-                const borderColorHover = event.type === 'expense' ? 'hover:border-orange-400/50' :
-                                         event.type === 'todo'    ? 'hover:border-blue-400/50' :
-                                                                    'hover:border-purple-400/50';
-                return `${base} ${borderColor} ${borderColorHover}`;
-            };
-
-            // 默认视图 (添加了点击事件以进入编辑模式)
-            return (
-                    <div
-                        onClick={() => setIsEditing(true)}
-                        className={`w-full mb-6 p-4 rounded-2xl border transition-all duration-300 backdrop-blur-sm cursor-pointer ${getCardStyle()}`}>
-
-                        <div className="flex justify-between items-start mb-2">
-                            <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border ${getColor()}`}>
-                                {getIcon()}
-                                <span>{getTypeLabel(event.type)}</span>
-                            </div>
-                            <div className="text-[10px] text-zinc-500 flex items-center gap-2">
-                                <span className="opacity-0 group-hover:opacity-100 transition-opacity bg-zinc-800 px-1.5 py-0.5 rounded">点击编辑</span>
-                                {formatDate(date)}
-                            </div>
-                        </div>
-
-                        <div className="text-sm text-zinc-200 mb-3">{event.raw_content}</div>
-
-                        {/* AI 解析出来的结构化数据展示 — 按类型边框着色 */}
-                        {Object.keys(event.ai_metadata).length > 0 && (
-                            <div className={`bg-zinc-950/50 rounded-lg p-2.5 mb-3 border ${
-                                event.type === 'expense' ? 'border-orange-500/15' :
-                                event.type === 'todo'    ? 'border-blue-500/15' :
-                                                          'border-purple-500/15'
-                            }`}>
-                                <div className="text-[10px] text-zinc-500 mb-1 flex items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={
-                                        event.type === 'expense' ? 'text-orange-400/60' :
-                                        event.type === 'todo'    ? 'text-blue-400/60' :
-                                                                  'text-purple-400/60'
-                                    }><path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                                    AI 结构化数据
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {Object.entries(event.ai_metadata).map(([key, val]) => (
-                                        <div key={key} className={`text-xs px-2 py-1 rounded ${
-                                            event.type === 'expense' ? 'bg-orange-500/10 text-orange-200/80' :
-                                            event.type === 'todo'    ? 'bg-blue-500/10 text-blue-200/80' :
-                                                                      'bg-purple-500/10 text-purple-200/80'
-                                        }`}>
-                                            <span className="text-zinc-500 mr-1">{getKeyLabel(key)}:</span>
-                                            {typeof val === 'object' ? JSON.stringify(val) : val}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* 待确认状态的 Action 按钮 — 按类型着色 */}
-                        {isPending && (
-                            <div className="flex gap-2 mt-2">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onConfirm(event.id);
-                                    }}
-                                    className={`flex-1 text-sm font-medium py-2 rounded-xl flex items-center justify-center gap-1 transition-colors ${
-                                        event.type === 'expense' ? 'bg-orange-500/20 hover:bg-orange-500/30 text-orange-300' :
-                                        event.type === 'todo'    ? 'bg-blue-500/20 hover:bg-blue-500/30 text-blue-300' :
-                                                                  'bg-purple-500/20 hover:bg-purple-500/30 text-purple-300'
-                                    }`}>
-                                    <Icons.Check /> 确认入库
-                                </button>
-                            </div>
-                        )}
-                    </div>
-            );
-        };
-
-        const Omnibox = ({ onSubmitText, onSimulateVision, isProcessing, engineStatus }) => {
-            const [text, setText] = useState('');
-            const [isListening, setIsListening] = useState(false);
-            const [voiceSupported, setVoiceSupported] = useState(true);
-            const recognitionRef = useRef(null);
-
-            // 初始化语音识别
-            const getRecognition = () => {
-                if (recognitionRef.current) return recognitionRef.current;
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SpeechRecognition) {
-                    setVoiceSupported(false);
-                    return null;
-                }
-                const rec = new SpeechRecognition();
-                rec.lang = 'zh-CN';
-                rec.interimResults = true;
-                rec.maxAlternatives = 1;
-                rec.continuous = false; // 说完一句话自动停止
-
-                rec.onresult = (event) => {
-                    let transcript = '';
-                    for (let i = event.resultIndex; i < event.results.length; i++) {
-                        transcript += event.results[i][0].transcript;
-                    }
-                    setText(transcript);
-                    // 如果是最终结果，自动提交
-                    if (event.results[event.results.length - 1].isFinal) {
-                        setIsListening(false);
-                        // 稍微延迟，让用户看到识别结果
-                        setTimeout(() => {
-                            if (transcript.trim() && !isProcessing) {
-                                onSubmitText(transcript.trim());
-                                setText('');
-                            }
-                        }, 600);
-                    }
-                };
-
-                rec.onerror = (event) => {
-                    console.error('[Voice]', event.error);
-                    setIsListening(false);
-                    if (event.error === 'not-allowed') {
-                        setVoiceSupported(false);
-                    }
-                };
-
-                rec.onend = () => {
-                    setIsListening(false);
-                };
-
-                recognitionRef.current = rec;
-                return rec;
-            };
-
-            const toggleVoice = () => {
-                if (isListening) {
-                    recognitionRef.current?.stop();
-                    setIsListening(false);
-                    return;
-                }
-                const rec = getRecognition();
-                if (!rec) return;
-                try {
-                    rec.start();
-                    setIsListening(true);
-                    setText('');
-                } catch (err) {
-                    console.error('[Voice start]', err);
-                    setIsListening(false);
-                }
-            };
-
-            const handleSubmit = (e) => {
-                e.preventDefault();
-                if (text.trim() && !isProcessing) {
-                    onSubmitText(text);
-                    setText('');
-                }
-            };
-
-            return (
-                <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-zinc-950 via-zinc-950 to-transparent pb-8 z-50">
-                    <form onSubmit={handleSubmit} className="flex items-center gap-2 max-w-lg mx-auto bg-zinc-900 border border-zinc-800 rounded-full p-1.5 pr-2 shadow-2xl backdrop-blur-xl transition-all focus-within:border-zinc-700">
-
-                        {/* 左侧：触发视觉多模态大模型 */}
-                        <button
-                            type="button"
-                            onClick={onSimulateVision}
-                            disabled={isProcessing}
-                            className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors disabled:opacity-50">
-                            <Icons.Camera />
-                        </button>
-
-                        {/* 中间：文本输入通道 */}
-                        <input
-                            type="text"
-                            value={text}
-                            onChange={(e) => setText(e.target.value)}
-                            placeholder={
-                                isProcessing ? (engineStatus === 'live' ? "AI 思考中..." : "处理中...") :
-                                isListening ? "正在聆听..." :
-                                (engineStatus === 'live' ? "输入或点🎤说话..." : "输入记录或指令...")
-                            }
-                            disabled={isProcessing}
-                            className="flex-1 bg-transparent border-none outline-none text-sm px-2 text-zinc-100 placeholder:text-zinc-600 disabled:opacity-50"
-                        />
-
-                        {/* 右侧：语音或提交 */}
-                        {text.trim() ? (
-                            <button
-                                type="submit"
-                                disabled={isProcessing}
-                                className="w-10 h-10 rounded-full bg-white/15 text-white flex items-center justify-center hover:bg-white/25 transition-colors disabled:opacity-50">
-                                <Icons.Send />
-                            </button>
-                        ) : voiceSupported ? (
-                            <button
-                                type="button"
-                                onClick={toggleVoice}
-                                disabled={isProcessing}
-                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                                    isListening
-                                        ? 'bg-red-500/30 text-red-400 animate-pulse shadow-[0_0_12px_rgba(239,68,68,0.4)]'
-                                        : 'bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700'
-                                } disabled:opacity-50`}>
-                                <Icons.Mic />
-                            </button>
-                        ) : (
-                            <button
-                                type="button"
-                                disabled
-                                className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-600 disabled:opacity-30"
-                                title="浏览器不支持语音识别">
-                                <Icons.Mic />
-                            </button>
-                        )}
-                    </form>
-                </div>
-            );
-        };
-
-        const App = () => {
-            const [events, setEvents] = useState(initialEvents);
-            const [isHeatmapOpen, setIsHeatmapOpen] = useState(false);
-            const [isProcessing, setIsProcessing] = useState(false);
-
-            // 每次 events 变化自动持久化到 localStorage
-            useEffect(() => {
-                saveEvents(events);
-            }, [events]);
-
-            // 启动时从 Supabase 加载，有后端数据则优先
-            const [backendLoaded, setBackendLoaded] = useState(false);
-            useEffect(() => {
-                if (hasBackend()) {
-                    loadFromBackend().then(backendEvents => {
-                        if (backendEvents && backendEvents.length > 0) {
-                            setEvents(backendEvents);
-                            console.log(`[Supabase] loaded ${backendEvents.length} events`);
-                        } else if (initialEvents.length > 0) {
-                            // 本地有数据但后端空 → 迁移本地到后端
-                            console.log('[Supabase] migrating localStorage → backend');
-                            initialEvents.forEach(e => saveToBackend(e));
-                        }
-                        setBackendLoaded(true);
-                    }).catch(err => {
-                        console.error('[Supabase] init error:', err);
-                        setBackendLoaded(true);
-                    });
-                } else {
-                    setBackendLoaded(true);
-                }
-            }, []);
-            const [selectedDate, setSelectedDate] = useState(null);
-            const [aiError, setAiError] = useState(null);
-            const [showSettings, setShowSettings] = useState(false);
-            const [engineStatus, setEngineStatus] = useState(getConfig().hasRealAI() ? 'live' : 'mock');
-            const [scrollZone, setScrollZone] = useState('now'); // 'now' | 'past' | 'future'
-
-            const feedRef = useRef(null);
-            const nowMarkerRef = useRef(null);
-
-            // 滚动到 NOW 轴心 (仅在初次加载时)
-            useEffect(() => {
-                if (nowMarkerRef.current && !selectedDate) {
-                    nowMarkerRef.current.scrollIntoView({ behavior: 'auto', block: 'center' });
-                }
-            }, []);
-
-            // 监听滚动位置，判断在"过去"还是"未来"
-            useEffect(() => {
-                const feed = feedRef.current;
-                if (!feed) return;
-
-                const handleScroll = () => {
-                    if (!nowMarkerRef.current) return;
-                    const nowTop = nowMarkerRef.current.offsetTop;
-                    const scrollCenter = feed.scrollTop + feed.clientHeight / 2;
-                    const threshold = 60; // 距离阈值，避免太灵敏
-
-                    if (Math.abs(scrollCenter - nowTop) < threshold) {
-                        setScrollZone('now');
-                    } else if (scrollCenter < nowTop) {
-                        setScrollZone('future'); // 看着未来，按钮在下面
-                    } else {
-                        setScrollZone('past');   // 看着过去，按钮在上面
-                    }
-                };
-
-                feed.addEventListener('scroll', handleScroll, { passive: true });
-                // 初始检测
-                setTimeout(handleScroll, 500);
-                return () => feed.removeEventListener('scroll', handleScroll);
-            }, []);
-
-            // 滚动到 NOW
-            const scrollToNow = () => {
-                if (nowMarkerRef.current) {
-                    nowMarkerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    setScrollZone('now');
-                }
-            };
-
-            // 核心更新：点击日历日期 -> 寻找锚点并平滑滚动
-            const handleSelectDate = (dateStr) => {
-                setSelectedDate(dateStr);
-                
-                setTimeout(() => {
-                    const targetId = `date-divider-${dateStr}`;
-                    const el = document.getElementById(targetId);
-                    
-                    if (el) {
-                        // 滚动到屏幕中间
-                        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        
-                        // 找到该日期的标签，加上高亮发光特效，然后淡出
-                        const pillEl = el.querySelector('.date-pill');
-                        if (pillEl) {
-                            pillEl.classList.add('bg-white/30', 'text-white/70', 'border-white/80', 'scale-110', 'shadow-[0_0_15px_rgba(255,255,255,0.4)]');
-                            setTimeout(() => {
-                                pillEl.classList.remove('bg-white/30', 'text-white/70', 'border-white/80', 'scale-110', 'shadow-[0_0_15px_rgba(255,255,255,0.4)]');
-                            }, 1500);
-                        }
-                    } else {
-                        // 如果当天完全没有数据，回弹到最近的地方或者做个小提示（这里选择控制台打印）
-                        console.log("该日期无记录");
-                    }
-                }, 50);
-            };
-
-            // 数据仅排序，不再被 selectedDate 强制过滤隐藏
-            const sortedEvents = useMemo(() => {
-                return [...events].sort((a, b) => new Date(b.timeline_time) - new Date(a.timeline_time));
-            }, [events]);
-
-            const now = new Date();
-            const futureEvents = sortedEvents.filter(e => new Date(e.timeline_time) > now);
-            const pastEvents = sortedEvents.filter(e => new Date(e.timeline_time) <= now);
-
-            // 从真实数据计算预算池（本月支出）
-            const budget = useMemo(() => {
-                const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-                const monthExpenses = events
-                    .filter(e => e.type === 'expense' && new Date(e.timeline_time) >= monthStart)
-                    .reduce((sum, e) => sum + (e.ai_metadata?.amount || 0), 0);
-                const defaultTotal = 5000;
-                return {
-                    spent: monthExpenses,
-                    remain: Math.max(0, defaultTotal - monthExpenses),
-                    total: defaultTotal,
-                };
-            }, [events, now]);
-
-            // 从真实数据计算今日任务
-            const todayTasks = useMemo(() => {
-                const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-                const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
-                const todayTodos = events.filter(e =>
-                    e.type === 'todo' &&
-                    new Date(e.timeline_time) >= todayStart &&
-                    new Date(e.timeline_time) < todayEnd
-                );
-                return {
-                    done: todayTodos.filter(e => e.status === 'done').length,
-                    total: todayTodos.length,
-                };
-            }, [events, now]);
-
-            // 渲染列表并插入日期分割线的辅助函数 (两栏布局：左1/3支出，右2/3其余)
-            const renderEventsWithDateDividers = (eventList) => {
-                let lastDate = null;
-                return eventList.map(event => {
-                    const d = new Date(event.timeline_time);
-                    const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                    const showDivider = lastDate !== dateStr;
-                    lastDate = dateStr;
-                    const isExpense = event.type === 'expense';
-                    const isPending = event.status === 'pending';
-
-                    return (
-                        <React.Fragment key={event.id}>
-                            {showDivider && (
-                                <div id={`date-divider-${dateStr}`} className="w-full flex items-center gap-4 py-6 opacity-80 transition-all duration-500">
-                                    <div className="h-px flex-1 bg-zinc-800/50"></div>
-                                    <div className="date-pill text-[10px] font-mono text-zinc-500 bg-zinc-900/50 px-3 py-1 rounded-full border border-zinc-800 transition-all duration-500 ease-out">
-                                        {dateStr}
-                                    </div>
-                                    <div className="h-px flex-1 bg-zinc-800/50"></div>
-                                </div>
-                            )}
-
-                            {/* 两栏事件行 */}
-                            <div className="flex w-full relative group">
-                                {/* 时间轴圆点 — 居中，按类型着色 */}
-                                <div className="absolute z-10 flex items-center gap-2" style={{left: 'calc(50% - 8px)'}}>
-                                    <div className={`w-4 h-4 rounded-full border-2 border-zinc-950 ${
-                                        isPending ? 'animate-pulse ' : ''
-                                    }${
-                                        event.type === 'expense' ? (isPending ? 'bg-orange-400/70 shadow-[0_0_10px_rgba(251,146,60,0.5)]' : 'bg-orange-400 shadow-[0_0_6px_rgba(251,146,60,0.3)]') :
-                                        event.type === 'todo'    ? (isPending ? 'bg-blue-400/70 shadow-[0_0_10px_rgba(96,165,250,0.5)]' : 'bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.3)]') :
-                                        event.type === 'note'    ? (isPending ? 'bg-purple-400/70 shadow-[0_0_10px_rgba(168,85,247,0.5)]' : 'bg-purple-400 shadow-[0_0_6px_rgba(168,85,247,0.3)]') :
-                                        'bg-zinc-500'
-                                    }`}></div>
-                                    <div className="text-[10px] text-zinc-400 font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-                                        {formatTime(new Date(event.timeline_time))}
-                                    </div>
-                                </div>
-
-                                {isExpense ? (
-                                    <>
-                                        <div className="w-1/2 pr-8 flex justify-end">
-                                            <div className="w-full max-w-[280px]">
-                                                <EventCard
-                                                    event={event}
-                                                    onConfirm={confirmEvent}
-                                                    onUpdate={updateEvent}
-                                                    onDelete={deleteEvent}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="w-1/2"></div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div className="w-1/2"></div>
-                                        <div className="w-1/2 pl-8">
-                                            <EventCard
-                                                event={event}
-                                                onConfirm={confirmEvent}
-                                                onUpdate={updateEvent}
-                                                onDelete={deleteEvent}
-                                            />
-                                        </div>
-                                    </>
-                                )}
-                            </div>
-                        </React.Fragment>
-                    );
-                });
-            };
-
-            // 发送文本给 AI (真实引擎 → 模拟引擎兜底)
-            const handleTextSubmit = async (text) => {
-                setIsProcessing(true);
-                let aiResult;
-                let usedRealAI = false;
-
-                try {
-                    // 优先级: 本地代理 > Edge Function > DeepSeek直接 > 模拟
-                    if (getConfig().hasLocalProxy()) {
-                        aiResult = await callLocalProxy({ text, engine: 'text' });
-                        usedRealAI = true;
-                    } else if (getConfig().hasProxy()) {
-                        aiResult = await callSupabaseProxy({ text, engine: 'text' });
-                        usedRealAI = true;
-                    } else if (getConfig().hasRealAI()) {
-                        aiResult = await callDeepSeekAPI(text);
-                        usedRealAI = true;
-                    } else {
-                        aiResult = await mockTextAI(text);
-                    }
-                } catch (err) {
-                    console.error('[AI Error]', err);
-                    setAiError({ message: err.message || 'AI 调用失败', code: err.code || 'unknown' });
-                    // 降级到模拟 AI
-                    aiResult = await mockTextAI(text);
-                    setAiError(prev => prev ? { ...prev, fallback: '已降级到本地模拟引擎' } : null);
-                }
-
-                const newEvent = {
-                    id: generateId(),
-                    timeline_time: aiResult.timeline_time || new Date().toISOString(),
-                    record_time: new Date().toISOString(),
-                    raw_content: text,
-                    type: aiResult.type,
-                    status: 'pending',
-                    ai_metadata: { ...aiResult.ai_metadata, _engine: getConfig().hasLocalProxy() ? 'local-proxy' : (getConfig().hasProxy() ? 'supabase-proxy' : (usedRealAI ? 'deepseek' : 'mock')) }
-                };
-
-                setEvents(prev => [newEvent, ...prev]);
-                setIsProcessing(false);
-                saveToBackend(newEvent);
-
-                setTimeout(() => {
-                    if (nowMarkerRef.current) {
-                        nowMarkerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                }, 100);
-            };
-
-            // 拍照发送给视觉大模型 (真实引擎 → 模拟引擎兜底)
-            const handleVisionSubmit = async () => {
-                setIsProcessing(true);
-                let aiResult;
-                let usedRealAI = false;
-
-                try {
-                    if (getConfig().hasLocalProxy() || getConfig().hasProxy() || getConfig().hasRealAI()) {
-                        const input = document.createElement('input');
-                        input.type = 'file';
-                        input.accept = 'image/*';
-                        const file = await new Promise((resolve) => {
-                            input.onchange = (e) => resolve(e.target.files[0]);
-                            input.oncancel = () => resolve(null);
-                            input.click();
-                        });
-                        if (!file) { setIsProcessing(false); return; }
-                        const base64 = await new Promise((resolve) => {
-                            const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result);
-                            reader.readAsDataURL(file);
-                        });
-                        // 优先级: 本地代理 > Edge Function > Vision直接
-                        if (getConfig().hasLocalProxy()) {
-                            aiResult = await callLocalProxy({ image_url: base64, engine: 'vision' });
-                        } else if (getConfig().hasProxy()) {
-                            aiResult = await callSupabaseProxy({ image_url: base64, engine: 'vision' });
-                        } else {
-                            aiResult = await callVisionAPI(base64);
-                        }
-                        usedRealAI = true;
-                    } else if (getConfig().hasRealAI()) {
-                        const input = document.createElement('input');
-                        input.type = 'file';
-                        input.accept = 'image/*';
-                        const file = await new Promise((resolve) => {
-                            input.onchange = (e) => resolve(e.target.files[0]);
-                            input.oncancel = () => resolve(null);
-                            input.click();
-                        });
-                        if (file) {
-                            const base64 = await new Promise((resolve) => {
-                                const reader = new FileReader();
-                                reader.onload = () => resolve(reader.result);
-                                reader.readAsDataURL(file);
-                            });
-                            aiResult = await callVisionAPI(base64);
-                            usedRealAI = true;
-                        } else {
-                            setIsProcessing(false);
-                            return;
-                        }
-                    } else {
-                        aiResult = await mockVisionAI();
-                    }
-                } catch (err) {
-                    console.error('[Vision AI Error]', err);
-                    setAiError({ message: err.message || '视觉 AI 调用失败', code: err.code || 'unknown' });
-                    aiResult = await mockVisionAI();
-                    setAiError(prev => prev ? { ...prev, fallback: '已降级到本地模拟引擎' } : null);
-                }
-
-                const newEvent = {
-                    id: generateId(),
-                    timeline_time: aiResult.timeline_time || new Date().toISOString(),
-                    record_time: new Date().toISOString(),
-                    raw_content: "[图片凭证已上传 - AI解析]",
-                    type: aiResult.type,
-                    status: 'pending',
-                    ai_metadata: { ...aiResult.ai_metadata, _engine: getConfig().hasProxy() ? 'supabase-proxy' : (usedRealAI ? 'vision' : 'mock') }
-                };
-
-                setEvents(prev => [newEvent, ...prev]);
-                setIsProcessing(false);
-                saveToBackend(newEvent);
-            };
-
-            const confirmEvent = (id) => {
-                setEvents(prev => {
-                    const next = prev.map(e =>
-                        e.id === id ? { ...e, status: e.type === 'todo' ? 'confirmed' : 'done' } : e
-                    );
-                    const updated = next.find(e => e.id === id);
-                    if (updated) saveToBackend(updated);
-                    return next;
-                });
-            };
-
-            const updateEvent = (id, updatedData) => {
-                setEvents(prev => {
-                    const next = prev.map(e => e.id === id ? { ...e, ...updatedData } : e);
-                    const updated = next.find(e => e.id === id);
-                    if (updated) saveToBackend(updated);
-                    return next;
-                });
-            };
-
-            const deleteEvent = (id) => {
-                setEvents(prev => prev.filter(e => e.id !== id));
-                deleteFromBackend(id);
-            };
-
-            return (
-                <div className="relative h-full w-full flex flex-col">
-                    {/* 背景层 */}
-                    <div className="absolute inset-0 dark-bg z-0"></div>
-
-                    {/* AI 引擎状态指示器 */}
-                    <div className="absolute top-4 right-4 z-[60] flex items-center gap-2">
-                        {hasBackend() && (
-                            <span className="text-[10px] px-2 py-1 rounded-full border bg-green-500/10 border-green-500/30 text-green-400">
-                                🗄 Supabase
+                    {/* 高光 */}
+                    <div className="absolute inset-0 rounded-full pointer-events-none"
+                        style={{background:gloss}}/>
+                    {/* 细边框 */}
+                    <div className="absolute inset-0 rounded-full pointer-events-none"
+                        style={{border:`1px solid ${active?'rgba(184,181,224,0.5)':'rgba(184,181,224,0.15)'}`}}/>
+                    {/* 百分比 — 仅在选中时显示 */}
+                    {active && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <span className="text-[11px] font-medium tabular-nums"
+                                style={{color:pct>55?'#fff':'var(--text-secondary)'}}>
+                                {Math.round(pct)}%
                             </span>
-                        )}
-                        <button
-                            onClick={() => setShowSettings(!showSettings)}
-                            className={`text-[10px] px-2 py-1 rounded-full border transition-all ${
-                                engineStatus === 'live'
-                                    ? 'bg-green-500/10 border-green-500/30 text-green-400'
-                                    : 'bg-zinc-800 border-zinc-700 text-zinc-500'
-                            }`}
-                        >
-                            {engineStatus === 'live' ? '⚡ AI 在线' : '🔸 模拟引擎'}
-                        </button>
-                    </div>
-
-                    {/* API 密钥设置面板 */}
-                    {showSettings && (
-                        <div className="absolute top-12 right-4 z-[70] w-80 bg-zinc-900 border border-zinc-700 rounded-2xl p-5 shadow-2xl backdrop-blur-xl">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-sm font-semibold text-zinc-200">AI 引擎配置</h3>
-                                <button onClick={() => setShowSettings(false)} className="text-zinc-500 hover:text-zinc-300 text-lg">&times;</button>
-                            </div>
-
-                            <div className="space-y-3">
-                                <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-1">
-                                    <label className="text-[10px] text-white/70 mb-1 block font-medium">推荐：Supabase Edge Function Proxy</label>
-                                    <p className="text-[10px] text-zinc-500 mb-2">密钥存储在服务端，更安全。需要部署 Edge Function。</p>
-                                    <input
-                                        type="text"
-                                        defaultValue={getConfig().supabaseUrl}
-                                        onChange={(e) => {
-                                            sessionStorage.setItem('supabase_url', e.target.value);
-                                            setEngineStatus(getConfig().hasRealAI() ? 'live' : 'mock');
-                                        }}
-                                        placeholder="https://xxx.supabase.co"
-                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 outline-none focus:border-white/40 mb-1"
-                                    />
-                                    <input
-                                        type="password"
-                                        defaultValue={getConfig().supabaseKey}
-                                        onChange={(e) => {
-                                            sessionStorage.setItem('supabase_key', e.target.value);
-                                            setEngineStatus(getConfig().hasRealAI() ? 'live' : 'mock');
-                                        }}
-                                        placeholder="anon key"
-                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 outline-none focus:border-white/40"
-                                    />
-                                </div>
-
-                                <div className="border-t border-zinc-800 pt-3">
-                                    <label className="text-[10px] text-zinc-500 mb-2 block">或者直接配置 API 密钥：</label>
-                                </div>
-
-                                <div>
-                                    <label className="text-[10px] text-zinc-500 mb-1 block">DeepSeek API Key (文本引擎)</label>
-                                    <input
-                                        type="password"
-                                        defaultValue={getConfig().deepseekKey}
-                                        onChange={(e) => {
-                                            sessionStorage.setItem('deepseek_key', e.target.value);
-                                            setEngineStatus(getConfig().hasRealAI() ? 'live' : 'mock');
-                                        }}
-                                        placeholder="sk-..."
-                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 outline-none focus:border-white/40"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] text-zinc-500 mb-1 block">Vision API Key (图像引擎)</label>
-                                    <input
-                                        type="password"
-                                        defaultValue={getConfig().visionKey}
-                                        onChange={(e) => {
-                                            sessionStorage.setItem('vision_key', e.target.value);
-                                            setEngineStatus(getConfig().hasRealAI() ? 'live' : 'mock');
-                                        }}
-                                        placeholder="视觉模型 API Key..."
-                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 outline-none focus:border-white/40"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] text-zinc-500 mb-1 block">Vision Base URL</label>
-                                    <input
-                                        type="text"
-                                        defaultValue={getConfig().visionBaseUrl}
-                                        onChange={(e) => sessionStorage.setItem('vision_base_url', e.target.value)}
-                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 outline-none focus:border-white/40"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] text-zinc-500 mb-1 block">Vision Model</label>
-                                    <select
-                                        defaultValue={getConfig().visionModel}
-                                        onChange={(e) => sessionStorage.setItem('vision_model', e.target.value)}
-                                        className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200 outline-none focus:border-white/40"
-                                    >
-                                        <option value="qwen-vl-max">Qwen-VL Max</option>
-                                        <option value="qwen-vl-plus">Qwen-VL Plus</option>
-                                        <option value="moonshot-v1-8k">Kimi (Moonshot)</option>
-                                        <option value="gpt-4o">GPT-4o</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <p className="text-[10px] text-zinc-600 mt-4 leading-relaxed">
-                                密钥仅存储在浏览器 sessionStorage 中，不会被上传到任何服务器。
-                                关闭标签页后自动清除。也可通过 URL 参数传入：
-                                <code className="text-zinc-500 block mt-1">?dk=sk-xxx&vk=yyy</code>
-                            </p>
                         </div>
-                    )}
-
-                    {/* AI 错误提示 Toast */}
-                    {aiError && (
-                        <div className="absolute top-16 left-1/2 -translate-x-1/2 z-[70] animate-in">
-                            <div className="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-sm backdrop-blur-xl shadow-2xl max-w-sm">
-                                <div className="flex items-start gap-2">
-                                    <span className="text-red-400 text-lg">⚠</span>
-                                    <div>
-                                        <p className="text-red-300 text-xs font-medium">{aiError.message}</p>
-                                        {aiError.fallback && (
-                                            <p className="text-zinc-400 text-[10px] mt-1">{aiError.fallback}</p>
-                                        )}
-                                    </div>
-                                    <button
-                                        onClick={() => setAiError(null)}
-                                        className="text-zinc-500 hover:text-zinc-300 ml-2"
-                                    >&times;</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* HUD Header */}
-                    <HUDHeader
-                        budget={budget}
-                        exp={todayTasks}
-                        isHeatmapOpen={isHeatmapOpen}
-                        toggleHeatmap={() => setIsHeatmapOpen(!isHeatmapOpen)}
-                        events={events}
-                        selectedDate={selectedDate}
-                        onSelectDate={handleSelectDate}
-                    />
-
-                    {/* Bi-directional Feed (中部时间轴) */}
-                    <div 
-                        ref={feedRef}
-                        className="flex-1 overflow-y-auto no-scrollbar pt-36 pb-32 px-4 z-10 relative scroll-smooth"
-                    >
-                        <div className="max-w-xl mx-auto flex flex-col items-center relative">
-                            {/* 连续时间轴线 — 居中，三色渐变 */}
-                            <div className="absolute top-0 bottom-0 left-1/2 w-px pointer-events-none" style={{background: 'linear-gradient(to bottom, rgba(168,85,247,0.15), rgba(96,165,250,0.12) 40%, rgba(255,255,255,0.08) 50%, rgba(251,146,60,0.12) 60%, rgba(168,85,247,0.15))'}}></div>
-
-                            {/* 未来计划区域 (向上滑动) - 插入了日期分割线 */}
-                            {renderEventsWithDateDividers(futureEvents)}
-
-                            {/* Now 轴心 — 川，三色渐变 */}
-                            <div ref={nowMarkerRef} className="w-full flex items-center gap-4 py-12 opacity-90">
-                                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-400/20 to-orange-400/20"></div>
-                                <div className="ripple-marker text-xs tracking-[0.3em] text-white/80 bg-white/5 px-5 py-2 rounded-full border border-white/10 backdrop-blur-md shadow-[0_0_20px_rgba(168,85,247,0.15),0_0_20px_rgba(96,165,250,0.15),0_0_20px_rgba(251,146,60,0.15)]">
-                                    此时
-                                </div>
-                                <div className="h-px flex-1 bg-gradient-to-l from-transparent via-blue-400/20 to-purple-400/20"></div>
-                            </div>
-
-                            {/* 历史记录区域 (向下滑动) - 插入了日期分割线 */}
-                            {renderEventsWithDateDividers(pastEvents)}
-
-                            <div className="py-12 text-xs text-zinc-700 font-mono">-- 达到时间轴边界 --</div>
-                        </div>
-                    </div>
-
-                    {/* 底部输入区 */}
-                    <Omnibox
-                        onSubmitText={handleTextSubmit}
-                        onSimulateVision={handleVisionSubmit}
-                        isProcessing={isProcessing}
-                        engineStatus={engineStatus}
-                    />
-
-                    {/* 回到此时 — 浮标按钮，三色光晕 */}
-                    {scrollZone !== 'now' && (
-                        <button
-                            onClick={scrollToNow}
-                            className={`fixed z-[70] left-1/2 -translate-x-1/2 px-4 py-1.5 rounded-full text-xs tracking-wider
-                                bg-zinc-900/90 border border-zinc-500/50 backdrop-blur-md
-                                text-white hover:bg-zinc-800
-                                transition-all duration-300 shadow-[0_0_20px_rgba(168,85,247,0.15),0_0_20px_rgba(96,165,250,0.15),0_0_20px_rgba(251,146,60,0.15)]
-                                animate-in
-                                ${scrollZone === 'past'
-                                    ? isHeatmapOpen ? 'top-[26rem]' : 'top-48'
-                                    : 'bottom-28'
-                                }`}
-                        >
-                            {scrollZone === 'past' ? '↓' : '↑'} 回到此时
-                        </button>
                     )}
                 </div>
-            );
-        };
+                {/* 标题 — 仅在选中时显示 */}
+                {active && (
+                    <span className="text-[9px] text-center leading-tight max-w-[70px] truncate"
+                        style={{color:fillColor,fontWeight:'500'}}>
+                        {o.title.length>6?o.title.slice(0,6)+'…':o.title}
+                    </span>
+                )}
+            </div>
+        );
+    };
 
-        try {
-            const rootEl = document.getElementById('root');
-            if (!rootEl) throw new Error('找不到 root 元素');
-            if (typeof React === 'undefined') throw new Error('React 未加载 — CDN 可能被拦截');
-            if (typeof ReactDOM === 'undefined') throw new Error('ReactDOM 未加载 — CDN 可能被拦截');
-            const root = ReactDOM.createRoot(rootEl);
-            root.render(<App />);
-        } catch (err) {
-            const fb = document.getElementById('fallback');
-            if (fb) {
-                fb.style.display = 'block';
-                fb.textContent = '错误: ' + (err.message || err);
+    // 日历球
+    const renderOrb = (d) => {
+        const s = dayStats[d] || { total:0, objs:{} };
+        const hasData = s.total > 0;
+        const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        let bgStyle = { backgroundColor: '#EDE7E0' };
+        if (hasData) {
+            const entries = Object.entries(s.objs);
+            if (entries.length >= 1) {
+                const total = entries.reduce((sum,[,c])=>sum+c,0);
+                const gradients = entries.map(([oid, count], i) => {
+                    const o = objectives.find(x=>x.id===oid);
+                    const color = o?.color || '#B8B5E0';
+                    const ratio = count/total;
+                    return `radial-gradient(circle at ${30+(i*30)}% ${40+(i*20)}%, ${color}${Math.round(ratio*90)} 0%, transparent 65%)`;
+                });
+                bgStyle = {
+                    background: gradients.join(', ') + ', #EDE7E0',
+                    boxShadow: hasData ? `0 0 ${8+s.total*3}px rgba(139,127,184,${Math.min(s.total*0.08,0.25)})` : 'none',
+                };
             }
-            console.error('React 渲染失败:', err);
         }
-    </script>
+        const sel = selectedDate===dateStr;
+        return (
+            <div key={d} onClick={()=>onSelectDate(sel?null:dateStr)}
+                className={`aspect-square rounded-full flex items-center justify-center text-[10px] cursor-pointer transition-all duration-300 hover:scale-110 relative ${sel?'ring-1 scale-110':''}`}
+                style={{...bgStyle, ...(sel?{boxShadow:'0 0 0 2px var(--accent-400)'}:{})}}>
+                <span className="relative z-10 font-light" style={{color:hasData||sel?'var(--text-primary)':'var(--text-tertiary)'}}>{d}</span>
+            </div>
+        );
+    };
+
+    return (
+        <div className="fixed top-0 left-0 right-0 z-50">
+            <div className="glass-strong px-4 pt-12 pb-3" style={{boxShadow:'var(--shadow-header)'}}>
+                {/* 标题行 */}
+                <div className="flex justify-between items-end mb-4">
+                    <div>
+                        <h1 className="text-xl font-light tracking-[0.15em]" style={{color:'var(--text-primary)'}}>川上</h1>
+                        <p className="text-[9px] mt-0.5 tracking-widest" style={{color:'var(--text-tertiary)'}}>timeline · FrsionOS v2</p>
+                    </div>
+                    <button onClick={onToggle} className="text-[10px] transition-colors tracking-wider" style={{color:'var(--text-tertiary)'}}>
+                        {isOpen?'收起日历':'展开日历'}
+                    </button>
+                </div>
+
+                {/* 3D 球体 OKR 展示 */}
+                <div className="flex items-center justify-center gap-5 mb-3">
+                    {objectives.map(o => <ObjSphere key={o.id} o={o} size={58}/>)}
+                    {objectives.length===0 && (
+                        <div className="text-[10px] py-4" style={{color:'var(--text-tertiary)'}}>还没有目标，输入 "/目标 名称" 创建</div>
+                    )}
+                    {/* 添加按钮 */}
+                    <div className="flex flex-col items-center gap-1.5 cursor-pointer select-none" onClick={onAddObj}>
+                        <div className="rounded-full flex items-center justify-center transition-colors"
+                            style={{width:58,height:58,border:'1px dashed rgba(139,127,184,0.25)'}}>
+                            <Ic.Plus/>
+                        </div>
+                        <span className="text-[9px]" style={{color:'var(--text-tertiary)'}}>新建</span>
+                    </div>
+                </div>
+
+                {/* 今日待办 */}
+                <div className="flex items-center justify-between text-[10px]">
+                    <span style={{color:'var(--text-tertiary)'}}>今日待办 <span style={{color:'var(--text-primary)',fontWeight:'500'}}>{todayTodos.done}/{todayTodos.total}</span></span>
+                    <span className="text-[9px]" style={{color:'var(--text-tertiary)',opacity:0.6}}>点击筛选 · 长按编辑</span>
+                </div>
+            </div>
+
+            {/* 日历热力 */}
+            <div className={`overflow-hidden transition-all duration-500 ease-out ${isOpen?'max-h-[420px] opacity-100':'max-h-0 opacity-0'}`}>
+                <div className="glass px-4 pb-4">
+                    <div className="flex justify-between items-center mb-3 pt-3 text-[10px]" style={{color:'var(--text-tertiary)'}}>
+                        <span>{year}年 {month+1}月</span>
+                        {(activeFilter||selectedDate) && <button onClick={()=>{onFilterObj(null);onSelectDate(null);}} style={{color:'var(--text-tertiary)'}}>清除筛选</button>}
+                    </div>
+                    <div className="grid grid-cols-7 gap-2 mb-2 text-center text-[9px]" style={{color:'var(--text-tertiary)'}}>
+                        {['一','二','三','四','五','六','日'].map(w=><div key={w}>{w}</div>)}
+                    </div>
+                    <div className="grid grid-cols-7 gap-2">
+                        {Array.from({length:startOffset}).map((_,i)=><div key={`e${i}`}></div>)}
+                        {Array.from({length:daysInMonth}).map((_,i)=>renderOrb(i+1))}
+                    </div>
+                    <div className="flex justify-center gap-4 mt-3 text-[9px]" style={{color:'var(--text-tertiary)'}}>
+                        {objectives.slice(0,4).map(o=>
+                            <div key={o.id} className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{backgroundColor:o.color}}></span>{o.title.length>6?o.title.slice(0,6)+'…':o.title}</div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// EventCard — 无边框，2px 左侧彩线
+// ==========================================
+const EventCard = ({ event, objectives, onConfirm, onUpdate, onDelete }) => {
+    const [editing,setEditing]=useState(false);
+    const [editData,setEditData]=useState(event);
+    const [showDel,setShowDel]=useState(false);
+    const d=new Date(event.timeline_time);
+    const obj=objectives.find(o=>o.id===event.objective_id);
+    const accent=obj?.color||'#B8B5E0';
+    const pending=event.status==='pending';
+
+    if(editing){
+        return (
+            <div className="mb-8 animate-fade-in">
+                <div className="flex justify-center mb-2">
+                    <div className="w-2 h-2 rounded-full" style={{backgroundColor:accent,boxShadow:`0 0 8px ${accent}55`}}/>
+                </div>
+                <div className="glass p-4" style={{borderRadius:'16px',borderLeft:`2px solid ${accent}`}}>
+                    <div className="text-[10px] mb-2" style={{color:'var(--text-tertiary)'}}>编辑</div>
+                    <textarea className="w-full glass-light p-3 text-sm outline-none resize-none h-20 font-light rounded-xl" style={{color:'var(--text-primary)'}}
+                        value={editData.raw_content} onChange={e=>setEditData({...editData,raw_content:e.target.value})}/>
+                    <div className="flex gap-2 mt-2">
+                        <select className="flex-1 glass-light px-3 py-2 text-xs outline-none rounded-xl" style={{color:'var(--text-secondary)'}}
+                            value={editData.objective_id||''} onChange={e=>setEditData({...editData,objective_id:e.target.value||null})}>
+                            <option value="">不关联目标</option>
+                            {objectives.map(o=><option key={o.id} value={o.id}>{o.title}</option>)}
+                        </select>
+                        <select className="flex-1 glass-light px-3 py-2 text-xs outline-none rounded-xl" style={{color:'var(--text-secondary)'}}
+                            value={editData.type} onChange={e=>setEditData({...editData,type:e.target.value})}>
+                            <option value="note">笔记</option><option value="todo">待办</option>
+                        </select>
+                    </div>
+                    <div className="flex gap-2 mt-2">
+                        <button onClick={()=>{onUpdate(event.id,editData);setEditing(false);}} className="flex-1 text-xs py-2 font-medium rounded-xl" style={{backgroundColor:'var(--accent-300)',color:'var(--text-inverse)'}}>保存</button>
+                        <button onClick={()=>setEditing(false)} className="flex-1 text-xs py-2 rounded-xl" style={{color:'var(--text-tertiary)'}}>取消</button>
+                        <button onClick={()=>setShowDel(!showDel)} className="px-3 hover:text-red-400" style={{color:'var(--text-tertiary)'}}><Ic.Trash/></button>
+                    </div>
+                    {showDel&&<button onClick={()=>{onDelete(event.id);setEditing(false);}} className="w-full mt-2 bg-red-500/10 text-red-400 text-xs py-2 rounded-xl hover:bg-red-500/20">确认删除</button>}
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="group mb-6 cursor-pointer transition-all duration-300 hover:scale-[1.01]" onClick={()=>setEditing(true)}>
+            {/* 彩色连接点 — 继承目标颜色 */}
+            <div className="flex justify-center mb-2">
+                <div className="w-2 h-2 rounded-full transition-shadow duration-300" style={{
+                    backgroundColor: accent,
+                    boxShadow: `0 0 8px ${accent}55, 0 0 16px ${accent}20`
+                }}/>
+            </div>
+            {/* 玻璃卡片 */}
+            <div className="glass p-4 transition-shadow duration-300" style={{
+                borderRadius:'16px',
+                borderLeft:`2px solid ${pending?accent+'60':accent}`
+            }}>
+                <div className="flex items-baseline gap-2 mb-1.5">
+                    <span className="text-[10px] tabular-nums" style={{color:'var(--text-tertiary)'}}>{fmtTime(d)}</span>
+                    {obj && <span className="text-[9px] truncate max-w-[140px] font-medium" style={{color:accent}}>{obj.title}</span>}
+                    <span className="text-[9px]" style={{color:'var(--text-tertiary)'}}>{TYPE_LABELS[event.type]}</span>
+                </div>
+                <p className="text-sm leading-relaxed mb-1 font-light" style={{color:pending?'var(--text-secondary)':'var(--text-primary)'}}>{event.raw_content}</p>
+                {event.ai_metadata?.task && <p className="text-[11px] font-light" style={{color:'var(--text-tertiary)'}}>{event.ai_metadata.task}{(event.ai_metadata?.progress_delta||0)>0&&<span className="ml-1 font-medium" style={{color:accent}}>+{event.ai_metadata.progress_delta}</span>}</p>}
+                {event.ai_metadata?.tags?.length>0 && <div className="flex gap-1 mt-1 flex-wrap">{event.ai_metadata.tags.map((t,i)=><span key={i} className="text-[9px] px-1.5 py-0.5 rounded-md" style={{backgroundColor:'var(--accent-100)',color:'var(--accent-500)'}}>{t}</span>)}</div>}
+                {pending&&event.type==='todo'&&<button onClick={e=>{e.stopPropagation();onConfirm(event.id);}} className="mt-2 text-[10px] flex items-center gap-1 font-medium" style={{color:'var(--accent-400)'}}><Ic.Check/> 标记完成</button>}
+                {event.status==='done'&&<span className="text-[10px]" style={{color:'var(--text-tertiary)'}}>已完成</span>}
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// 目标编辑弹窗
+// ==========================================
+const ObjEditor = ({ objective, onSave, onClose }) => {
+    const [title,setTitle]=useState(objective?.title||'');
+    const [target,setTarget]=useState(objective?.target||100);
+    const [current,setCurrent]=useState(objective?.current||0);
+    const [color,setColor]=useState(objective?.color||OBJ_PALETTE[0]);
+    const isNew=!objective;
+
+    return (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/20 backdrop-blur-sm" onClick={onClose}>
+            <div className="glass-strong w-[320px] p-5 space-y-4 animate-fade-in rounded-2xl" onClick={e=>e.stopPropagation()} style={{boxShadow:'var(--shadow-card-hover)'}}>
+                <h3 className="text-sm font-medium" style={{color:'var(--text-primary)'}}>{isNew?'新建目标':'编辑目标'}</h3>
+                <input className="w-full glass-light p-2.5 text-sm outline-none focus:border-lavender-300 font-light rounded-xl" style={{color:'var(--text-primary)'}} placeholder="目标名称" value={title} onChange={e=>setTitle(e.target.value)} autoFocus/>
+                <div className="flex gap-3">
+                    <div className="flex-1"><label className="text-[10px] block mb-1" style={{color:'var(--text-tertiary)'}}>目标值</label><input type="number" className="w-full glass-light p-2 text-sm outline-none rounded-xl" style={{color:'var(--text-primary)'}} value={target} onChange={e=>setTarget(parseInt(e.target.value)||0)}/></div>
+                    <div className="flex-1"><label className="text-[10px] block mb-1" style={{color:'var(--text-tertiary)'}}>当前进度</label><input type="number" className="w-full glass-light p-2 text-sm outline-none rounded-xl" style={{color:'var(--text-primary)'}} value={current} onChange={e=>setCurrent(parseInt(e.target.value)||0)}/></div>
+                </div>
+                <div><label className="text-[10px] block mb-1" style={{color:'var(--text-tertiary)'}}>主题色</label><div className="flex gap-2 flex-wrap">{OBJ_PALETTE.map(c=><button key={c} className={`w-7 h-7 rounded-full transition-transform ${color===c?'scale-125 ring-1':''}`} style={{backgroundColor:c,...(color===c?{boxShadow:'0 0 0 2px var(--accent-400)'}:{})}} onClick={()=>setColor(c)}/>)}</div></div>
+                <div className="flex gap-2 pt-2">
+                    <button className="flex-1 text-xs py-2.5 font-medium rounded-xl" style={{backgroundColor:'var(--accent-300)',color:'var(--text-inverse)'}} onClick={()=>{if(title.trim())onSave({title:title.trim(),target,current,color});}}>{isNew?'创建':'保存'}</button>
+                    <button className="flex-1 text-xs py-2.5 rounded-xl" style={{color:'var(--text-tertiary)'}} onClick={onClose}>取消</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// Omnibox
+// ==========================================
+const Omnibox = ({ onSubmitText, isProcessing }) => {
+    const [text,setText]=useState('');
+    const [listening,setListening]=useState(false);
+    const [voiceOk,setVoiceOk]=useState(true);
+    const recRef=useRef(null);
+
+    const getRec=()=>{
+        if(recRef.current)return recRef.current;
+        const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+        if(!SR){setVoiceOk(false);return null;}
+        const r=new SR();r.lang='zh-CN';r.interimResults=true;r.continuous=false;
+        r.onresult=e=>{let t='';for(let i=e.resultIndex;i<e.results.length;i++)t+=e.results[i][0].transcript;setText(t);if(e.results[e.results.length-1].isFinal){setListening(false);setTimeout(()=>{if(t.trim()){onSubmitText(t.trim());setText('');}},400);}};
+        r.onerror=()=>setListening(false);r.onend=()=>setListening(false);
+        recRef.current=r;return r;
+    };
+    const toggleVoice=()=>{if(listening){recRef.current?.stop();return;}const r=getRec();if(!r)return;try{r.start();setListening(true);setText('');}catch{}};
+    const submit=e=>{e.preventDefault();if(text.trim()&&!isProcessing){onSubmitText(text.trim());setText('');}};
+
+    return (
+        <div className="fixed bottom-0 left-0 right-0 p-4 pb-8 z-50" style={{background:'linear-gradient(to top,rgba(245,240,235,1) 0%,rgba(245,240,235,0.95) 60%,transparent 100%)'}}>
+            <form onSubmit={submit} className={`flex items-center gap-2 max-w-lg mx-auto h-11 px-4 glass-light transition-all duration-300 rounded-xl ${isProcessing?'animate-pulse-glow':''}`}>
+                <input type="text" value={text} onChange={e=>setText(e.target.value)} placeholder={isProcessing?'AI 处理中...':listening?'聆听中...':'输入记录 或 "/目标 名称" 创建目标'} disabled={isProcessing} className="flex-1 bg-transparent border-none outline-none text-sm font-light disabled:opacity-30" style={{color:'var(--text-primary)'}}/>
+                {text.trim()?<button type="submit" disabled={isProcessing} style={{color:'var(--text-tertiary)'}}><Ic.Send/></button>
+                :voiceOk?<button type="button" onClick={toggleVoice} style={{color:listening?'var(--color-error)':'var(--text-tertiary)'}}><Ic.Mic/></button>
+                :null}
+            </form>
+        </div>
+    );
+};
+
+// ==========================================
+// App
+// ==========================================
+const App = () => {
+    // 支持 ?reset 参数强制清除旧数据
+    if (window.location.search.includes('reset')) {
+        localStorage.removeItem(EV_KEY);
+        localStorage.removeItem(OBJ_KEY);
+        console.log('localStorage cleared — using mock data');
+    }
+    const [events,setEvents]=useState(()=>{const d=load(EV_KEY);return(d&&d.length)?d:MOCK_EVENTS;});
+    const [objectives,setObjectives]=useState(()=>{const d=load(OBJ_KEY);return(d&&d.length)?d:MOCK_OBJS;});
+    const [hudOpen,setHudOpen]=useState(false);
+    const [processing,setProcessing]=useState(false);
+    const [activeFilter,setActiveFilter]=useState(null);
+    const [selectedDate,setSelectedDate]=useState(null);
+    const [toast,setToast]=useState(null);
+    const [objEditor,setObjEditor]=useState(null); // null | {objective}|true (=新建)
+    const feedRef=useRef(null); const nowRef=useRef(null);
+
+    // 启动时从 Supabase 加载数据
+    useEffect(()=>{
+        (async () => {
+            const remote = await loadFromSB();
+            if (remote) {
+                if (remote.events.length > 0) {
+                    setEvents(remote.events);
+                    save(EV_KEY, remote.events);
+                }
+                if (remote.objectives.length > 0) {
+                    setObjectives(remote.objectives);
+                    save(OBJ_KEY, remote.objectives);
+                }
+                console.log(`[Supabase] loaded ${remote.events.length} events, ${remote.objectives.length} objectives`);
+            }
+        })();
+    },[]);
+    useEffect(()=>{save(EV_KEY,events);},[events]);
+    useEffect(()=>{save(OBJ_KEY,objectives);},[objectives]);
+    useEffect(()=>{nowRef.current?.scrollIntoView({behavior:'auto',block:'center'});},[]);
+
+    const toast_ = msg => { setToast(msg); setTimeout(()=>setToast(null),2500); };
+
+    const now=new Date();
+    const nowIso=now.toISOString();
+
+    // 今日待办统计
+    const todayTodos=useMemo(()=>{
+        const ts=todayStr();
+        const todayEs=events.filter(e=>e.type==='todo'&&e.timeline_time.startsWith(ts));
+        return {done:todayEs.filter(e=>e.status==='done').length,total:todayEs.length};
+    },[events]);
+
+    const filtered=useMemo(()=>{
+        let es=[...events].sort((a,b)=>new Date(b.timeline_time)-new Date(a.timeline_time));
+        if(activeFilter) es=es.filter(e=>e.objective_id===activeFilter);
+        if(selectedDate) es=es.filter(e=>tsDay(new Date(e.timeline_time))===selectedDate);
+        return es;
+    },[events,activeFilter,selectedDate]);
+
+    const future=filtered.filter(e=>e.timeline_time>nowIso);
+    const past=filtered.filter(e=>e.timeline_time<=nowIso);
+
+    const handleSubmit = async text => {
+        // "/目标" 前缀 → 直接创建目标
+        if(/^\/目标[：:]\s*(.+)/.test(text)||/^\/obj[：:]\s*(.+)/i.test(text)){
+            const m=text.match(/^(?:\/目标|\/obj)[：:]\s*(.+)/);
+            const title=m[1].trim();
+            setObjectives(prev=>[...prev,{id:uid(),title,target:100,current:0,color:OBJ_PALETTE[Math.floor(Math.random()*OBJ_PALETTE.length)]}]);
+            toast_(`目标「${title}」已创建`); return;
+        }
+
+        setProcessing(true);
+        try {
+            let aiRes; try{aiRes=await callAI(text,objectives);}catch(e){aiRes=localParse(text);}
+            if(aiRes.type==='objective'){
+                setObjectives(prev=>[...prev,{id:uid(),title:aiRes.ai_metadata.title,target:100,current:0,color:aiRes.ai_metadata.color||OBJ_PALETTE[Math.floor(Math.random()*OBJ_PALETTE.length)]}]);
+                toast_(`AI 创建目标「${aiRes.ai_metadata.title}」`); setProcessing(false); return;
+            }
+            let tl=aiRes.timeline_time?new Date(aiRes.timeline_time):null;
+            if(!tl||isNaN(tl.getTime())) tl=parseTime(text);
+            const oid=aiRes.objective_id||matchObj(text,objectives);
+            const ev={id:uid(),timeline_time:tl.toISOString(),record_time:new Date().toISOString(),raw_content:text,type:aiRes.type||'note',status:'pending',objective_id:oid||undefined,ai_metadata:aiRes.ai_metadata||{}};
+            setEvents(prev=>[ev,...prev]);
+            saveEventToSB(ev);
+            if(oid&&(aiRes.ai_metadata?.progress_delta||0)>0){
+                setObjectives(prev=>{
+                    const updated=prev.map(o=>o.id===oid?{...o,current:o.current+(aiRes.ai_metadata.progress_delta||0)}:o);
+                    const obj=updated.find(o=>o.id===oid);
+                    if(obj) saveObjToSB(obj);
+                    return updated;
+                });
+            }
+            const on=objectives.find(o=>o.id===oid);
+            toast_(`${TYPE_LABELS[ev.type]} · ${fmtDate(tl)} ${fmtTime(tl)}${on?' → '+on.title:''}`);
+        }catch(e){toast_('⚠ '+(e.message||'出错'));}
+        finally{setProcessing(false);setTimeout(()=>nowRef.current?.scrollIntoView({behavior:'smooth',block:'center'}),100);}
+    };
+
+    const confirmEvent=id=>{
+        setEvents(prev=>{
+            const updated=prev.map(e=>e.id===id?{...e,status:'done'}:e);
+            const ev=updated.find(e=>e.id===id);
+            if(ev) saveEventToSB(ev);
+            return updated;
+        });
+        toast_('✓ 已完成');
+    };
+    const updateEvent=(id,data)=>{
+        setEvents(prev=>{
+            const updated=prev.map(e=>e.id===id?{...e,...data}:e);
+            const ev=updated.find(e=>e.id===id);
+            if(ev) saveEventToSB(ev);
+            return updated;
+        });
+    };
+    const deleteEvent=id=>{
+        setEvents(prev=>prev.filter(e=>e.id!==id));
+        deleteEventFromSB(id);
+        toast_('已删除');
+    };
+    const deleteObj=id=>{
+        setObjectives(prev=>prev.filter(o=>o.id!==id));
+        setEvents(prev=>prev.map(e=>e.objective_id===id?{...e,objective_id:undefined}:e));
+        deleteObjFromSB(id);
+        setActiveFilter(f=>f===id?null:f);
+        toast_('目标已删除');
+    };
+    const saveObj=data=>{
+        const newObj = objEditor===true
+            ? {id:uid(),...data}
+            : {...objEditor,...data};
+        if(objEditor===true){
+            setObjectives(prev=>[...prev,newObj]);
+            toast_('目标已创建');
+        }else{
+            setObjectives(prev=>prev.map(o=>o.id===objEditor.id?{...o,...data}:o));
+            toast_('目标已更新');
+        }
+        saveObjToSB(newObj);
+        setObjEditor(null);
+    };
+
+    // 渲染时间轴
+    const renderTL = list => {
+        let lastDate=null;
+        return list.map(ev=>{
+            const d=new Date(ev.timeline_time); const ds=tsDay(d); const showDiv=lastDate!==ds; lastDate=ds;
+            return <React.Fragment key={ev.id}>
+                {showDiv&&<div id={`date-${ds}`} className="flex items-center gap-3 py-8 first:pt-0"><div className="flex-1 h-px" style={{backgroundColor:'rgba(184,181,224,0.15)'}}></div><span className="text-[10px] font-light tracking-wider" style={{color:'var(--text-tertiary)'}}>{ds}</span><div className="flex-1 h-px" style={{backgroundColor:'rgba(184,181,224,0.15)'}}></div></div>}
+                <EventCard event={ev} objectives={objectives} onConfirm={confirmEvent} onUpdate={updateEvent} onDelete={deleteEvent}/>
+            </React.Fragment>;
+        });
+    };
+
+    // ==========================================
+    // 空时间轴欢迎卡片
+    // ==========================================
+    const EmptyWelcome = () => (
+        <div className="flex flex-col items-center justify-center py-16 animate-fade-in">
+            <div className="glass w-72 p-6 text-center space-y-3" style={{borderRadius:'20px',boxShadow:'var(--shadow-card)'}}>
+                <div className="w-3 h-3 rounded-full mx-auto animate-shimmer" style={{background:'radial-gradient(circle at 40% 35%, rgba(200,195,210,0.8), rgba(184,181,224,0.3))',boxShadow:'0 0 12px rgba(184,181,224,0.3)'}}></div>
+                <p className="text-sm font-medium" style={{color:'var(--text-primary)'}}>时间轴为空</p>
+                <p className="text-xs leading-relaxed" style={{color:'var(--text-tertiary)'}}>在下方输入框记录第一个事件<br/>开启你的时间之河</p>
+            </div>
+        </div>
+    );
+
+    // 回到此时 — 浮动按钮
+    const [showScrollBtn, setShowScrollBtn] = useState(false);
+    useEffect(() => {
+        const el = feedRef.current;
+        if (!el) return;
+        const onScroll = () => {
+            const nowEl = nowRef.current;
+            if (!nowEl) return;
+            const rect = nowEl.getBoundingClientRect();
+            const containerRect = el.getBoundingClientRect();
+            setShowScrollBtn(rect.top < 0 || rect.top > containerRect.height);
+        };
+        el.addEventListener('scroll', onScroll, {passive:true});
+        return () => el.removeEventListener('scroll', onScroll);
+    }, []);
+    const scrollToNow = () => {
+        nowRef.current?.scrollIntoView({behavior:'smooth',block:'center'});
+    };
+
+    return (
+        <div className="relative h-full w-full flex flex-col">
+            <div className="absolute inset-0 beige-bg z-0"></div>
+            {toast&&<div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] animate-in"><div className="glass-strong px-5 py-2.5 text-xs font-light tracking-wide rounded-xl" style={{color:'var(--text-primary)',boxShadow:'var(--shadow-card)'}}>{toast}</div></div>}
+            {objEditor!==null&&<ObjEditor objective={objEditor===true?null:objEditor} onSave={saveObj} onClose={()=>setObjEditor(null)}/>}
+
+            <HUD objectives={objectives} events={events} todayTodos={todayTodos} onAddObj={()=>setObjEditor(true)} onEditObj={o=>setObjEditor(o)} onDeleteObj={deleteObj} onFilterObj={setActiveFilter} activeFilter={activeFilter} selectedDate={selectedDate} onSelectDate={setSelectedDate} isOpen={hudOpen} onToggle={()=>setHudOpen(!hudOpen)}/>
+
+            <div ref={feedRef} className="flex-1 overflow-y-auto no-scrollbar flow-scroll pt-10 pb-32 px-5 z-10 relative"
+                style={{paddingTop:hudOpen?'400px':'190px',transition:'padding-top 0.5s ease-out'}}>
+                <div className="max-w-lg mx-auto">
+                    {(activeFilter||selectedDate)&&<div className="flex items-center gap-2 mb-4 text-[10px]">
+                        <span style={{color:'var(--text-tertiary)'}}>筛选:</span>
+                        {activeFilter&&<span style={{color:objectives.find(o=>o.id===activeFilter)?.color}}>{objectives.find(o=>o.id===activeFilter)?.title}</span>}
+                        {selectedDate&&<span style={{color:'var(--text-tertiary)'}}>{selectedDate}</span>}
+                        <button style={{color:'var(--text-tertiary)'}} onClick={()=>{setActiveFilter(null);setSelectedDate(null);}}>清除</button>
+                    </div>}
+                    {filtered.length===0 && !activeFilter && !selectedDate ? <EmptyWelcome/> : <>
+                        {renderTL(future.reverse())}
+                        <div ref={nowRef} className="flex items-center gap-3 py-10"><div className="flex-1 h-px" style={{backgroundColor:'rgba(184,181,224,0.2)'}}></div><span className="text-[10px] font-light tracking-[0.3em]" style={{color:'var(--accent-400)'}}>此时</span><div className="flex-1 h-px" style={{backgroundColor:'rgba(184,181,224,0.2)'}}></div></div>
+                        {renderTL(past)}
+                        <div className="py-16 text-center text-[10px] font-light tracking-widest" style={{color:'var(--text-tertiary)',opacity:0.5}}>时间轴边界</div>
+                    </>}
+                </div>
+            </div>
+
+            {/* 回到此时 — 浮动按钮 */}
+            {showScrollBtn && (
+                <button onClick={scrollToNow}
+                    className="fixed right-5 z-40 glass animate-fade-in flex items-center justify-center"
+                    style={{
+                        bottom:'120px',width:44,height:44,borderRadius:'50%',
+                        boxShadow:'var(--shadow-card)',
+                    }}>
+                    <span className="text-xs" style={{color:'var(--accent-400)'}}>↓</span>
+                </button>
+            )}
+
+            <Omnibox onSubmitText={handleSubmit} isProcessing={processing}/>
+        </div>
+    );
+};
+
+try {
+    const root=ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App/>);
+} catch(err){
+    const fb=document.getElementById('fallback');
+    if(fb){fb.style.display='block';fb.textContent='Error: '+(err.message||err);}
+    console.error(err);
+}
+</script>
 </body>
 </html>

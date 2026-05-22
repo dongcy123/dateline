@@ -1,44 +1,150 @@
 #!/usr/bin/env python3
 """
-TimelineOS — 本地 AI 代理服务器
-绕过 CORS 限制，在本地转发请求到 DeepSeek 和 Vision API。
+川上 AI 代理服务器 — 本地开发用
+绕过 CORS 限制，转发请求到 DeepSeek 和 Qwen-VL。
 启动: python proxy-server.py
 端口: 8765
 """
 
-import json
-import os
-import http.server
-import urllib.request
-import ssl
+import json, os, re, http.server, urllib.request, ssl, traceback
+from datetime import datetime, timezone, timedelta
 
-DEEPSEEK_KEY = "sk-59667e37ac864780895095182443388f"
+DEEPSEEK_KEY = os.environ.get("DEEPSEEK_KEY", "sk-59667e37ac864780895095182443388f")
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
-VISION_KEY = "sk-9069631b201a4f5997a10682ff399dba"
+VISION_KEY = os.environ.get("VISION_KEY", "sk-9069631b201a4f5997a10682ff399dba")
 VISION_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
 VISION_MODEL = "qwen-vl-max"
 
-SYSTEM_PROMPT = """你是一个个人管理助手。分析用户输入并返回严格的 JSON。
+CST = timezone(timedelta(hours=8))
 
-规则：
-1. 如果涉及金额、消费、购物 → type: "expense"，ai_metadata: {"amount": 数字, "tag": "餐饮|购物|交通|娱乐|教育|其他"}
-2. 如果是任务、待办、提醒、计划 → type: "todo"，ai_metadata: {"task": "任务名", "priority": "high|normal|low"}
-3. 其他记录、想法、笔记、灵感 → type: "note"，ai_metadata: {"summary": "摘要"}
+SYSTEM_PROMPT = """你是《川上》个人战略执行系统的 AI 助手。分析用户输入，返回严格 JSON。
 
-**时间提取（关键）：**
-- 从用户输入中提取事件发生的真实时间，作为 timeline_time 字段
-- 支持：绝对时间（"下午五点"→17:00）、相对时间（"昨晚八点"→昨天的20:00、"明天上午"→明天的上午）、日期+时间（"下周三下午3点"）
-- timeline_time 必须是 ISO 8601 格式字符串（如 "2026-05-20T17:00:00+08:00"）
-- 如果用户没有指定时间，使用当前时间
-- 消费记录用发生时间，待办用计划执行时间，笔记用灵感产生时间
+类型判断:
+- todo: 待执行的行动、任务、计划
+- note: 记录、想法、观察、已完成的事
+
+输出格式:
+{"type":"todo|note","objective_id":null,"ai_metadata":{"task":"摘要","progress_delta":数字,"tags":["标签"]},"timeline_time":"ISO 8601 或 null"}
+
+progress_delta: 已完成且有数量→提取数字(如"标注10张"→10); 待做→0; 无数字→1
+如果是创建目标/标签，type="objective"，ai_metadata={"title":"目标名","color":"#hex"}
+
+时间提取:
+- 绝对时间: "下午五点"→17:00, "上午九点"→09:00
+- 相对时间: "昨晚八点"→昨天20:00, "明天上午十点"→明天10:00
+- 日期+时间: "下周三下午3点"→推算日期, ISO 8601格式
+- 无法提取则 timeline_time 为 null（前端用当前时间）
 
 只返回 JSON，不要任何额外文字。"""
 
 
-def call_deepseek(text):
-    """文本 → DeepSeek（含时间提取）"""
-    from datetime import datetime, timezone, timedelta
-    now = datetime.now(timezone(timedelta(hours=8)))  # CST
+def parse_chinese_time(text: str) -> str | None:
+    """服务端中文时间解析 — 提取明确的绝对/相对时间"""
+    now = datetime.now(CST)
+
+    # 日期偏移
+    base = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if "大后天" in text:
+        base = base + timedelta(days=3)
+    elif "后天" in text:
+        base = base + timedelta(days=2)
+    elif "明天" in text or "明早" in text or "明晚" in text:
+        base = base + timedelta(days=1)
+    elif "昨天" in text or "昨晚" in text:
+        base = base - timedelta(days=1)
+    elif "前天" in text:
+        base = base - timedelta(days=2)
+
+    # 星期匹配
+    weekdays = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6, "日": 0, "天": 0}
+    m = re.search(r"(下?周)([一二三四五六日天])", text)
+    if m:
+        target = weekdays[m.group(2)]
+        current = base.weekday()
+        diff = (target - current) % 7
+        if diff == 0:
+            diff = 7
+        if "下" in m.group(1):
+            diff += 7
+        base = base + timedelta(days=diff)
+
+    # 月份日期
+    m = re.search(r"(\d{1,2})月(\d{1,2})[日号]?", text)
+    if m:
+        try:
+            base = base.replace(month=int(m.group(1)), day=int(m.group(2)))
+        except ValueError:
+            pass
+
+    # 时间段
+    is_pm = bool(re.search(r"下午|晚上|今晚|傍晚", text))
+    is_am = bool(re.search(r"上午|早上|早晨|凌晨", text))
+
+    # 提取小时
+    hour = None
+    minute = 0
+
+    # 数字+点/时/:
+    m = re.search(r"(\d{1,2})[点:：时](\d{1,2})?", text)
+    if m:
+        hour = int(m.group(1))
+        if m.group(2):
+            minute = int(m.group(2))
+    elif "半" in text:
+        # "五点半" → 5:30
+        m = re.search(r"(\d{1,2})点半", text)
+        if m:
+            hour = int(m.group(1))
+            minute = 30
+
+    if hour is not None:
+        if is_pm and hour < 12:
+            hour += 12
+        elif is_am and hour == 12:
+            hour = 0
+        elif hour <= 6 and not is_am and not is_pm:
+            # 凌晨 1-6 点不转换(通常是下午时段)
+            if hour >= 7:
+                pass  # 保持原样
+
+        # 处理中文数字+十二小时制的下午
+        if "下午" in text or "晚上" in text:
+            m_cn = re.search(r"下午(\d{1,2})", text)
+            if m_cn:
+                h = int(m_cn.group(1))
+                if h < 12:
+                    hour = h + 12
+
+        base = base.replace(hour=hour, minute=minute)
+        return base.isoformat()
+
+    # 模糊时间
+    if re.search(r"早上|早晨", text) and hour is None:
+        base = base.replace(hour=8, minute=0)
+        return base.isoformat()
+    if re.search(r"上午", text) and hour is None:
+        base = base.replace(hour=10, minute=0)
+        return base.isoformat()
+    if re.search(r"中午", text) and hour is None:
+        base = base.replace(hour=12, minute=0)
+        return base.isoformat()
+    if re.search(r"下午", text) and hour is None:
+        base = base.replace(hour=15, minute=0)
+        return base.isoformat()
+    if re.search(r"晚上|今晚", text) and hour is None:
+        base = base.replace(hour=20, minute=0)
+        return base.isoformat()
+
+    # 没有明显时间标记 — 返回 None（前端用当前时间）
+    if hour is None and not re.search(r"[点时:]|\d{1,2}月|周[一二三四五六日天]", text):
+        return None
+
+    return base.isoformat() if hour is not None else None
+
+
+def call_deepseek(text: str) -> dict:
+    """DeepSeek 文本解析 + 服务端时间增强"""
+    now = datetime.now(CST)
     now_str = now.strftime("%Y-%m-%dT%H:%M:%S+08:00")
 
     req = urllib.request.Request(
@@ -47,7 +153,7 @@ def call_deepseek(text):
             "model": "deepseek-chat",
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f'当前时间：{now_str}\n\n分析以下中文输入，提取事件类型、结构化数据、以及事件发生的真实时间：\n\n"{text}"'},
+                {"role": "user", "content": f'当前时间：{now_str}\n\n分析以下中文输入：\n\n"{text}"'},
             ],
             "temperature": 0.3,
             "response_format": {"type": "json_object"},
@@ -58,14 +164,30 @@ def call_deepseek(text):
         },
     )
     ctx = ssl.create_default_context()
-    res = urllib.request.urlopen(req, timeout=30, context=ctx)
+    res = urllib.request.urlopen(req, timeout=60, context=ctx)
     data = json.loads(res.read())
     content = data["choices"][0]["message"]["content"]
-    return json.loads(content)
+    # 清理可能的 markdown 包裹
+    cleaned = content.replace("```json\n", "").replace("```\n", "").replace("```", "").strip()
+    result = json.loads(cleaned)
+
+    # 服务端时间增强：如果 AI 没有返回有效时间，用本地解析补充
+    ai_time = result.get("timeline_time")
+    if not ai_time or ai_time == "null":
+        local_time = parse_chinese_time(text)
+        if local_time:
+            result["timeline_time"] = local_time
+            print(f"  [time] local parse → {local_time}")
+
+    # 确保 objective_id 字段存在
+    if "objective_id" not in result:
+        result["objective_id"] = None
+
+    return result
 
 
-def call_vision(image_url):
-    """图像 → Vision Model"""
+def call_vision(image_url: str) -> dict:
+    """Qwen-VL 图像识别"""
     req = urllib.request.Request(
         VISION_URL,
         data=json.dumps({
@@ -88,84 +210,139 @@ def call_vision(image_url):
         },
     )
     ctx = ssl.create_default_context()
-    res = urllib.request.urlopen(req, timeout=30, context=ctx)
+    res = urllib.request.urlopen(req, timeout=60, context=ctx)
     data = json.loads(res.read())
     content = data["choices"][0]["message"]["content"]
-    # Vision models may wrap JSON in markdown
     cleaned = content.replace("```json\n", "").replace("```\n", "").replace("```", "").strip()
-    return json.loads(cleaned)
+    result = json.loads(cleaned)
+
+    if "objective_id" not in result:
+        result["objective_id"] = None
+
+    return result
+
+
+def validate_response(result: dict) -> dict:
+    """标准化输出格式"""
+    if "type" not in result:
+        raise ValueError("AI 返回缺少 type 字段")
+    if result["type"] not in ("todo", "note", "objective"):
+        raise ValueError(f"无效 type: {result['type']}")
+
+    return {
+        "type": result.get("type", "note"),
+        "objective_id": result.get("objective_id"),
+        "ai_metadata": result.get("ai_metadata", {}),
+        "timeline_time": result.get("timeline_time"),
+    }
 
 
 class ProxyHandler(http.server.BaseHTTPRequestHandler):
     def do_OPTIONS(self):
-        self.send_cors()
+        self._cors_headers()
         self.end_headers()
+
+    def do_GET(self):
+        """健康检查"""
+        parsed = urllib.request.urlparse(self.path)
+        if parsed.path == "/health":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps({
+                "status": "ok",
+                "engines": ["deepseek-chat", "qwen-vl-max"],
+                "version": "2.0.0"
+            }).encode())
+            return
+        self.send_error(404, "Not found")
 
     def do_POST(self):
         try:
-            # Read request body with proper UTF-8 decoding
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length)
-            body = json.loads(raw.decode('utf-8')) if length > 0 else {}
+            body = json.loads(raw.decode("utf-8")) if length > 0 else {}
 
             text = body.get("text", "")
             image_url = body.get("image_url", "")
             engine = body.get("engine", "auto")
 
-            print(f"[Proxy] engine={engine} text={text[:40] if text else ''} image={bool(image_url)}")
-
-            # Route to appropriate AI engine
+            # 智能路由
             if image_url and engine != "text":
+                engine_name = "vision"
                 result = call_vision(image_url)
             elif text:
+                engine_name = "text"
                 result = call_deepseek(text)
             else:
-                self.send_error(400, json.dumps({"error": {"code": "invalid_request", "message": "Must provide text or image_url"}}))
+                self._error(400, "invalid_request", "需要提供 text 或 image_url")
                 return
 
-            # Validate and return
-            if "type" not in result or "ai_metadata" not in result:
-                self.send_error(422, json.dumps({"error": {"code": "parse_error", "message": "AI returned invalid format"}}))
-                return
+            # 验证并标准化
+            validated = validate_response(result)
 
-            timeline = result.get('timeline_time', '')
-            print(f"[Proxy] -> type={result.get('type')} time={timeline} meta={json.dumps(result.get('ai_metadata',{}), ensure_ascii=False)[:80]}")
-
-            resp = {
-                "type": result.get("type", "note"),
-                "ai_metadata": result.get("ai_metadata", {}),
-                "timeline_time": timeline or None,  # None = use current time
-            }
+            print(f"[proxy] {engine_name} → type={validated['type']} "
+                  f"time={validated.get('timeline_time','now')} "
+                  f"text={text[:50] if text else '[image]'}")
 
             self.send_response(200)
-            self.send_cors()
             self.send_header("Content-Type", "application/json")
+            self._cors_headers()
             self.end_headers()
-            self.wfile.write(json.dumps(resp, ensure_ascii=False).encode("utf-8"))
+            self.wfile.write(json.dumps(validated, ensure_ascii=False).encode("utf-8"))
+
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="replace")
+            print(f"[proxy] HTTP {e.code}: {body[:200]}")
+            if e.code == 401:
+                self._error(401, "api_key_invalid", "API 密钥无效")
+            elif e.code == 429:
+                self._error(429, "rate_limit", "请求过于频繁，请稍后重试")
+            else:
+                self._error(502, "ai_api_error", f"AI API {e.code}: {body[:120]}")
+
+        except json.JSONDecodeError as e:
+            print(f"[proxy] JSON parse error: {e}")
+            self._error(422, "parse_error", f"AI 返回了无效 JSON: {str(e)[:100]}")
+
+        except ValueError as e:
+            print(f"[proxy] Validation error: {e}")
+            self._error(422, "parse_error", str(e))
 
         except Exception as e:
-            msg = str(e)
-            print(f"[Proxy] ERROR: {msg}")
-            self.send_error(500, json.dumps({"error": {"code": "api_error", "message": msg}}))
+            print(f"[proxy] Internal error: {traceback.format_exc()}")
+            self._error(500, "internal", str(e)[:200])
 
-    def send_cors(self):
-        self.send_response(200)
+    def _cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, apikey, x-client-info")
         self.send_header("Access-Control-Max-Age", "86400")
 
+    def _error(self, status: int, code: str, message: str):
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self._cors_headers()
+        self.end_headers()
+        self.wfile.write(json.dumps({
+            "error": {"code": code, "message": message}
+        }, ensure_ascii=False).encode("utf-8"))
+
     def log_message(self, format, *args):
-        pass  # Suppress default logs
+        pass  # 关闭默认 HTTP 日志
 
 
 if __name__ == "__main__":
-    port = 8765
+    port = int(os.environ.get("PORT", 8765))
     print(f"╔══════════════════════════════════════╗")
-    print(f"║   TimelineOS AI Proxy Server        ║")
+    print(f"║   川上 AI Proxy Server v2.0         ║")
     print(f"║   端口: {port}                        ║")
-    print(f"║   引擎: DeepSeek + Qwen-VL          ║")
+    print(f"║   文本: DeepSeek Chat               ║")
+    print(f"║   视觉: Qwen-VL Max                 ║")
     print(f"║   http://localhost:{port}              ║")
     print(f"╚══════════════════════════════════════╝")
+    print(f"  DEEPSEEK_KEY: {'✓' if DEEPSEEK_KEY else '✗'}")
+    print(f"  VISION_KEY:   {'✓' if VISION_KEY else '✗'}")
     print()
     http.server.HTTPServer(("0.0.0.0", port), ProxyHandler).serve_forever()

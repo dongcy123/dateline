@@ -1,6 +1,5 @@
-// TimelineOS — AI Dual-Engine Proxy
-// Supabase Edge Function (Deno)
-// 文本 → DeepSeek | 图像 → Vision Model | 统一 JSON 输出
+// 川上 AI 代理 — Supabase Edge Function (Deno)
+// 文本 → DeepSeek | 图像 → Qwen-VL | 统一 JSON 输出
 
 import { corsHeaders } from '../_shared/cors.ts';
 
@@ -11,49 +10,39 @@ interface AIProxyRequest {
 }
 
 interface AIProxyResponse {
-  type: 'expense' | 'todo' | 'note';
+  type: 'todo' | 'note' | 'objective';
+  objective_id: string | null;
   ai_metadata: Record<string, unknown>;
+  timeline_time?: string | null;
   confidence?: number;
-  raw_text?: string;
 }
 
-interface AIProxyError {
-  error: {
-    type: string;
-    code: string;
-    message: string;
-    param?: string;
-    doc_url?: string;
-  };
-}
+const SYSTEM_PROMPT = `你是《川上》个人战略执行系统的 AI 助手。分析用户输入，返回严格 JSON。
 
-const SYSTEM_PROMPT = `你是一个个人管理助手。分析用户输入并返回严格的 JSON。
+类型判断:
+- todo: 待执行的行动、任务、计划
+- note: 记录、想法、观察、已完成的事
+- 创建目标时 type="objective"，ai_metadata={"title":"目标名","color":"#hex"}
 
-规则：
-1. 如果涉及金额、消费、购物 → type: "expense"，ai_metadata: {"amount": 数字, "tag": "餐饮|购物|交通|娱乐|教育|其他"}
-2. 如果是任务、待办、提醒、计划 → type: "todo"，ai_metadata: {"task": "任务名", "priority": "high|normal|low"}
-3. 其他记录、想法、笔记、灵感 → type: "note"，ai_metadata: {"summary": "摘要"}
+输出格式:
+{"type":"todo|note|objective","objective_id":null,"ai_metadata":{"task":"摘要","progress_delta":数字,"tags":["标签"]},"timeline_time":"ISO 8601 或 null"}
 
-**时间提取（关键）：**
-- 从用户输入中提取事件发生的真实时间，作为 timeline_time 字段
-- 支持：绝对时间（"下午五点"→17:00）、相对时间（"昨晚八点"→昨天的20:00）、日期+时间
-- timeline_time 必须是 ISO 8601 格式字符串（如 "2026-05-20T17:00:00+08:00"）
-- 如果用户没有指定时间，使用当前时间
-- 消费记录用发生时间，待办用计划执行时间
+progress_delta: 已完成且有数量→提取数字(如"标注10张"→10); 待做→0; 无数字→1
+
+时间提取:
+- 绝对时间: "下午五点"→17:00, "上午九点"→09:00
+- 相对时间: "昨晚八点"→昨天20:00, "明天上午十点"→明天10:00
+- 日期+时间: "下周三下午3点"→推算日期, ISO 8601格式
+- 无法提取则 timeline_time 为 null
 
 只返回 JSON，不要任何额外文字。`;
 
 function parseAIResponse(content: string): AIProxyResponse {
-  // Try direct JSON parse first
   try {
     const parsed = JSON.parse(content);
     return validateResponse(parsed);
   } catch {
-    // Vision models may wrap JSON in markdown
-    const cleaned = content
-      .replace(/```json\n?/g, '')
-      .replace(/```\n?/g, '')
-      .trim();
+    const cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const parsed = JSON.parse(cleaned);
     return validateResponse(parsed);
   }
@@ -61,14 +50,15 @@ function parseAIResponse(content: string): AIProxyResponse {
 
 function validateResponse(raw: Record<string, unknown>): AIProxyResponse {
   const type = raw.type as string;
-  if (!['expense', 'todo', 'note'].includes(type)) {
+  if (!['todo', 'note', 'objective'].includes(type)) {
     throw new Error(`Invalid type: ${type}`);
   }
   return {
     type: type as AIProxyResponse['type'],
+    objective_id: (raw.objective_id as string) || null,
     ai_metadata: (raw.ai_metadata as Record<string, unknown>) || {},
+    timeline_time: raw.timeline_time as string | null,
     confidence: raw.confidence as number | undefined,
-    raw_text: raw.raw_text as string | undefined,
   };
 }
 
@@ -76,17 +66,17 @@ async function callDeepSeek(text: string): Promise<AIProxyResponse> {
   const key = Deno.env.get('DEEPSEEK_API_KEY');
   if (!key) throw { code: 'config_error', message: 'DEEPSEEK_API_KEY not set' };
 
+  const now = new Date();
+  const nowStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00+08:00`;
+
   const res = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${key}`,
-    },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({
       model: 'deepseek-chat',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `分析以下中文输入，判断类型并提取结构化数据：\n\n"${text}"` },
+        { role: 'user', content: `当前时间：${nowStr}\n\n分析以下中文输入：\n\n"${text}"` },
       ],
       temperature: 0.3,
       response_format: { type: 'json_object' },
@@ -103,7 +93,6 @@ async function callDeepSeek(text: string): Promise<AIProxyResponse> {
   const data = await res.json();
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw { code: 'parse_error', message: 'DeepSeek 返回为空' };
-
   return parseAIResponse(content);
 }
 
@@ -116,10 +105,7 @@ async function callVision(imageUrl: string): Promise<AIProxyResponse> {
 
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${key}`,
-    },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({
       model,
       messages: [
@@ -146,35 +132,27 @@ async function callVision(imageUrl: string): Promise<AIProxyResponse> {
   const data = await res.json();
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw { code: 'parse_error', message: '视觉 AI 返回为空' };
-
   return parseAIResponse(content);
 }
 
-function errorResponse(err: { code: string; message: string }, status: number): Response {
-  const body: AIProxyError = {
+function errorJSON(err: { code: string; message: string }, status: number): Response {
+  return new Response(JSON.stringify({
     error: {
       type: err.code.startsWith('api_') ? 'api_error' : err.code === 'rate_limit' ? 'rate_limit' : 'parse_error',
       code: err.code,
       message: err.message,
-      doc_url: 'https://github.com/timeline-os/errors',
     },
-  };
-  return new Response(JSON.stringify(body), {
+  }), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 }
 
-// ==========================================
-// Main handler
-// ==========================================
 Deno.serve(async (req: Request) => {
-  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Only POST
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed. Use POST.' }), {
       status: 405,
@@ -182,31 +160,17 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const debug = Deno.env.get('AI_PROXY_DEBUG') === 'true';
-
   try {
     const body: AIProxyRequest = await req.json();
     const engine = body.engine || (body.image_url ? 'vision' : 'text');
 
-    if (debug) {
-      console.log('[ai-proxy] engine:', engine, 'text:', body.text?.slice(0, 50), 'image:', !!body.image_url);
-    }
-
     let result: AIProxyResponse;
-
     if (engine === 'vision' && body.image_url) {
       result = await callVision(body.image_url);
     } else if (body.text) {
       result = await callDeepSeek(body.text);
     } else {
-      return errorResponse(
-        { code: 'invalid_request', message: '必须提供 text 或 image_url' },
-        400,
-      );
-    }
-
-    if (debug) {
-      console.log('[ai-proxy] result:', JSON.stringify(result));
+      return errorJSON({ code: 'invalid_request', message: '必须提供 text 或 image_url' }, 400);
     }
 
     return new Response(JSON.stringify(result), {
@@ -217,22 +181,12 @@ Deno.serve(async (req: Request) => {
     const e = err as { code?: string; message?: string };
     const code = e.code || 'unknown';
     const message = e.message || '未知错误';
+    console.error('[ai-proxy]', code, message);
 
-    console.error('[ai-proxy] error:', code, message);
-
-    // Map error codes to HTTP status
     const statusMap: Record<string, number> = {
-      config_error: 500,
-      api_key_invalid: 401,
-      rate_limit: 429,
-      parse_error: 422,
-      api_error: 502,
-      invalid_request: 400,
+      config_error: 500, api_key_invalid: 401, rate_limit: 429,
+      parse_error: 422, api_error: 502, invalid_request: 400,
     };
-
-    return errorResponse(
-      { code, message },
-      statusMap[code] || 500,
-    );
+    return errorJSON({ code, message }, statusMap[code] || 500);
   }
 });

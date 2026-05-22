@@ -136,14 +136,13 @@ async function callVisionAPI(imageUrl: string): Promise<AIProxyResponse> {
 }
 
 export function buildDeepSeekPrompt(text: string): string {
-  return `分析以下中文输入，判断类型并提取结构化数据：\n\n"${text}"\n\n返回 JSON: {"type":"expense|todo|note","ai_metadata":{...}}`;
+  return `分析以下中文输入，判断类型并提取结构化数据：\n\n"${text}"\n\n返回 JSON: {"type":"todo|note","ai_metadata":{...}}`;
 }
 
 const SYSTEM_PROMPT = `你是一个个人管理助手。分析用户输入并返回严格的 JSON。
 
 规则：
-1. 如果涉及金额、消费、购物 → type: "expense"，ai_metadata: {"amount": 数字, "tag": "餐饮|购物|交通|娱乐|教育|其他"}
-2. 如果是任务、待办、提醒 → type: "todo"，ai_metadata: {"task": "任务名", "priority": "high|normal|low"}
-3. 其他记录、想法、笔记 → type: "note"，ai_metadata: {"summary": "摘要"}
+1. 如果是任务、待办、提醒 → type: "todo"，ai_metadata: {"task": "任务名", "priority": "high|normal|low"}
+2. 其他记录、想法、笔记 → type: "note"，ai_metadata: {"summary": "摘要"}
 
 只返回 JSON，不要任何额外文字。`;

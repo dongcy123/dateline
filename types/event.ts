@@ -1,25 +1,20 @@
-export type EventType = 'expense' | 'todo' | 'note';
-export type EventStatus = 'pending' | 'confirmed' | 'done';
-export type Priority = 'high' | 'normal' | 'low';
+export type EventType = 'todo' | 'note';
+export type EventStatus = 'pending' | 'done';
 
-export interface ExpenseMeta {
-  amount: number;
-  tag: string;
-  merchant?: string;
-}
-
-export interface TodoMeta {
-  task: string;
-  priority: Priority;
-  due_date?: string;
-}
-
-export interface NoteMeta {
-  summary?: string;
+export interface AIMetadata {
+  task?: string;
+  progress_delta?: number;
   tags?: string[];
+  [key: string]: unknown;
 }
 
-export type AIMetadata = ExpenseMeta | TodoMeta | NoteMeta | Record<string, never>;
+export interface Objective {
+  id: string;
+  title: string;
+  target: number;
+  current: number;
+  color: string;
+}
 
 export interface TimelineEvent {
   id: string;
@@ -28,6 +23,7 @@ export interface TimelineEvent {
   raw_content: string;
   type: EventType;
   status: EventStatus;
+  objective_id?: string;
   ai_metadata: AIMetadata;
   created_at?: string;
 }

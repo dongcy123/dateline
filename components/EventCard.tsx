@@ -57,6 +57,27 @@ export function EventCard({ event, onConfirm, onUpdate, onDelete }: EventCardPro
             multiline
           />
 
+          <Text style={styles.timeLabel}>时间</Text>
+          <TextInput
+            style={styles.editInputSmall}
+            value={(() => { const d = new Date(editData.timeline_time); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; })()}
+            onChangeText={(t) => {
+              try { const d = new Date(t); if (!isNaN(d.getTime())) setEditData({ ...editData, timeline_time: d.toISOString() }); } catch {}
+            }}
+            placeholder="YYYY-MM-DDTHH:MM"
+            placeholderTextColor="#52525b"
+          />
+
+          <View style={styles.statusRow}>
+            <TouchableOpacity
+              style={[styles.checkbox, editData.status === 'done' && styles.checkboxChecked]}
+              onPress={() => setEditData({ ...editData, status: editData.status === 'done' ? 'pending' : 'done' })}
+            >
+              {editData.status === 'done' && <Text style={styles.checkmark}>✓</Text>}
+            </TouchableOpacity>
+            <Text style={styles.statusLabel}>已完成</Text>
+          </View>
+
           <View style={styles.editActions}>
             <TouchableOpacity
               style={styles.saveBtn}
@@ -174,6 +195,13 @@ const styles = StyleSheet.create({
   deleteBtn: { backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   deleteText: { color: '#f87171', fontSize: 12 },
   editInput: { backgroundColor: 'rgba(255,255,255,0.25)', borderWidth: 0.5, borderColor: 'rgba(184,181,224,0.2)', borderRadius: 12, padding: 12, color: '#2D2838', fontSize: 14, minHeight: 80, textAlignVertical: 'top', marginBottom: 12 },
+  timeLabel: { fontSize: 10, color: '#8B84A0', marginBottom: 4 },
+  editInputSmall: { backgroundColor: 'rgba(255,255,255,0.25)', borderWidth: 0.5, borderColor: 'rgba(184,181,224,0.2)', borderRadius: 12, padding: 10, color: '#2D2838', fontSize: 13, marginBottom: 12 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: 'rgba(184,181,224,0.4)', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.25)' },
+  checkboxChecked: { backgroundColor: '#B8B5E0', borderColor: '#8B7FB8' },
+  checkmark: { color: '#F5F0EB', fontSize: 14, fontWeight: '700' },
+  statusLabel: { fontSize: 13, color: '#5C5670' },
   editActions: { flexDirection: 'row', gap: 8 },
   saveBtn: { flex: 1, backgroundColor: '#B8B5E0', borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
   saveText: { color: '#F5F0EB', fontSize: 13, fontWeight: '500' },

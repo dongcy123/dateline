@@ -10,13 +10,7 @@ const OBJ_PALETTE = [
   '#9B8FC0','#C89090','#88B8A8','#B89088','#8898B8','#9888B0','#7B6EA0',
 ];
 
-const MOCK_OBJS: Objective[] = [
-  { id: 'obj-1', title: '多模态知识图谱构建', target: 300, current: 120, color: '#8B7FB8' },
-  { id: 'obj-2', title: '跨文化教案开发',       target: 5,   current: 3,   color: '#C48080' },
-  { id: 'obj-3', title: '全栈产品原型迭代',     target: 12,  current: 7,   color: '#7EB8A0' },
-  { id: 'obj-4', title: '深度学习论文精读',     target: 20,  current: 8,   color: '#8090B8' },
-  { id: 'obj-5', title: '个人品牌内容输出',     target: 30,  current: 5,   color: '#B8A080' },
-];
+const MOCK_OBJS: Objective[] = [];
 
 // Supabase 客户端 (按需初始化)
 let sb: any = null;

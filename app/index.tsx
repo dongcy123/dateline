@@ -54,7 +54,7 @@ export default function HomeScreen() {
       (e) => e.type === 'todo' && new Date(e.timeline_time) >= today
     );
     const done = todayTodos.filter((e) => e.status === 'done').length;
-    return { done, total: todayTodos.length || 5 };
+    return { done, total: todayTodos.length };
   }, [events]);
 
   // Filter events by selected date

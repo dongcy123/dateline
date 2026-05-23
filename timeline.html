@@ -167,50 +167,9 @@ const deleteObjFromSB = async (id) => {
     } catch(e) { console.warn('[SB] delete obj error:', e.message); }
 };
 
-const MOCK_OBJS = [
-    { id:'obj-1', title:'多模态知识图谱构建', target:300, current:120, color:'#8B7FB8' },
-    { id:'obj-2', title:'跨文化教案开发',       target:5,   current:3,   color:'#C48080' },
-    { id:'obj-3', title:'全栈产品原型迭代',     target:12,  current:7,   color:'#7EB8A0' },
-    { id:'obj-4', title:'深度学习论文精读',     target:20,  current:8,   color:'#8090B8' },
-    { id:'obj-5', title:'个人品牌内容输出',     target:30,  current:5,   color:'#B8A080' },
-];
+const MOCK_OBJS = [];
 
-// 生成相对时间的辅助函数
-const relTime = (daysAgo, hour, minute=0) => {
-    const d = new Date();
-    d.setDate(d.getDate() - daysAgo);
-    d.setHours(hour, minute, 0, 0);
-    return d.toISOString();
-};
-
-const MOCK_EVENTS = [
-    // 今天
-    { id:'ev-01', timeline_time: relTime(0,9,30),  record_time: relTime(0,9,30),  raw_content:'整理知识图谱的实体对齐模块，标注了 50 组跨语言实体对', type:'todo', status:'done', objective_id:'obj-1', ai_metadata:{task:'实体对齐标注',progress_delta:50,tags:['标注','知识图谱']} },
-    { id:'ev-02', timeline_time: relTime(0,10,15), record_time: relTime(0,10,15), raw_content:'上午完成了 Neo4j 图数据库的 schema 设计初稿', type:'note', status:'done', objective_id:'obj-1', ai_metadata:{task:'Schema 设计',tags:['数据库','架构']} },
-    { id:'ev-03', timeline_time: relTime(0,14,0),  record_time: relTime(0,14,0),  raw_content:'写完第三章跨文化教学案例分析，涉及中德课堂对比', type:'todo', status:'done', objective_id:'obj-2', ai_metadata:{task:'第三章撰写',progress_delta:1,tags:['写作','教案']} },
-    { id:'ev-04', timeline_time: relTime(0,16,20), record_time: relTime(0,16,20), raw_content:'原型 v3.2 部署到测试环境，修复了时间轴滚动性能问题', type:'todo', status:'done', objective_id:'obj-3', ai_metadata:{task:'部署 v3.2',progress_delta:1,tags:['部署','性能']} },
-    { id:'ev-05', timeline_time: relTime(0,19,0),  record_time: relTime(0,19,0),  raw_content:'阅读《Attention Is All You Need》第三章，重点理解多头注意力机制的数学推导', type:'note', status:'done', objective_id:'obj-4', ai_metadata:{task:'论文阅读',progress_delta:1,tags:['深度学习','Transformer']} },
-    // 昨天
-    { id:'ev-06', timeline_time: relTime(1,8,45),  record_time: relTime(1,8,45),  raw_content:'梳理了目前三个数据源的实体类型，准备做 ontology 映射', type:'todo', status:'done', objective_id:'obj-1', ai_metadata:{task:'实体类型梳理',progress_delta:0,tags:['数据工程']} },
-    { id:'ev-07', timeline_time: relTime(1,11,0),  record_time: relTime(1,11,0),  raw_content:'写了两篇小红书初稿，主题是「AI 时代的个人知识管理」', type:'todo', status:'done', objective_id:'obj-5', ai_metadata:{task:'内容撰写',progress_delta:2,tags:['写作','自媒体']} },
-    { id:'ev-08', timeline_time: relTime(1,15,30), record_time: relTime(1,15,30), raw_content:'用 Figma 重新设计了设置页面的交互流程', type:'note', status:'done', objective_id:'obj-3', ai_metadata:{task:'设计迭代',tags:['Figma','UX']} },
-    { id:'ev-09', timeline_time: relTime(1,20,0),  record_time: relTime(1,20,0),  raw_content:'德国教案第二部分需要补充跨文化沟通的实际场景练习', type:'todo', status:'pending', objective_id:'obj-2', ai_metadata:{task:'教案补充',progress_delta:0,tags:['教案','待办']} },
-    // 前天
-    { id:'ev-10', timeline_time: relTime(2,9,0),   record_time: relTime(2,9,0),   raw_content:'整理了知识图谱可视化方案的竞品分析，输出了一份对比文档', type:'note', status:'done', objective_id:'obj-1', ai_metadata:{task:'竞品分析',tags:['调研','可视化']} },
-    { id:'ev-11', timeline_time: relTime(2,14,0),  record_time: relTime(2,14,0),  raw_content:'读完了 DeepSeek-V3 技术报告，对 MoE 架构有了新的理解', type:'note', status:'done', objective_id:'obj-4', ai_metadata:{task:'技术报告阅读',progress_delta:1,tags:['大模型','MoE']} },
-    { id:'ev-12', timeline_time: relTime(2,16,30), record_time: relTime(2,16,30), raw_content:'产品原型用户测试 v3，收集了 5 份反馈，主要问题集中在导航清晰度', type:'todo', status:'done', objective_id:'obj-3', ai_metadata:{task:'用户测试',progress_delta:1,tags:['测试','用户反馈']} },
-    // 3天前
-    { id:'ev-13', timeline_time: relTime(3,10,0),  record_time: relTime(3,10,0),  raw_content:'开始搭建知识图谱的向量索引，选用 Milvus 作为向量数据库', type:'note', status:'done', objective_id:'obj-1', ai_metadata:{task:'向量索引搭建',tags:['Milvus','向量']} },
-    { id:'ev-14', timeline_time: relTime(3,15,0),  record_time: relTime(3,15,0),  raw_content:'录制了一期播客大纲，主题：从零构建个人 AI 工作流', type:'todo', status:'done', objective_id:'obj-5', ai_metadata:{task:'播客大纲',progress_delta:1,tags:['播客','AI']} },
-    { id:'ev-15', timeline_time: relTime(3,18,0),  record_time: relTime(3,18,0),  raw_content:'第四章教案框架完成，重点设计互动讨论环节', type:'todo', status:'done', objective_id:'obj-2', ai_metadata:{task:'教案框架',progress_delta:1,tags:['教案']} },
-    // 5天前
-    { id:'ev-16', timeline_time: relTime(5,9,30),  record_time: relTime(5,9,30),  raw_content:'完成全栈原型 v3.0 的前端重构，从 RN 迁移到 Expo Router', type:'todo', status:'done', objective_id:'obj-3', ai_metadata:{task:'前端重构',progress_delta:1,tags:['重构','Expo']} },
-    { id:'ev-17', timeline_time: relTime(5,14,0),  record_time: relTime(5,14,0),  raw_content:'精读论文：GraphRAG — 用知识图谱增强检索增强生成', type:'note', status:'done', objective_id:'obj-4', ai_metadata:{task:'GraphRAG 论文',progress_delta:1,tags:['RAG','知识图谱']} },
-    { id:'ev-18', timeline_time: relTime(5,17,0),  record_time: relTime(5,17,0),  raw_content:'本周发布了 3 篇技术博客，后台阅读量累计 2.3k', type:'note', status:'done', objective_id:'obj-5', ai_metadata:{task:'发布统计',tags:['博客','数据']} },
-    // 一周前
-    { id:'ev-19', timeline_time: relTime(7,10,0),  record_time: relTime(7,10,0),  raw_content:'确定了知识图谱的评估指标体系：实体覆盖率、关系准确率、查询响应时间', type:'note', status:'done', objective_id:'obj-1', ai_metadata:{task:'评估指标定义',tags:['评估','指标']} },
-    { id:'ev-20', timeline_time: relTime(7,16,0),  record_time: relTime(7,16,0),  raw_content:'产品原型 v2.8 完成核心功能闭环：输入→AI解析→时间轴展示→目标关联', type:'todo', status:'done', objective_id:'obj-3', ai_metadata:{task:'核心闭环',progress_delta:1,tags:['里程碑','MVP']} },
-];
+const MOCK_EVENTS = [];
 
 // ==========================================
 // AI 引擎
@@ -255,7 +214,7 @@ const parseTime = (text,ref=new Date)=>{
     const wm={'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'日':0,'天':0};
     const nw=text.match(/下周([一二三四五六日天])/); if(nw){const t=wm[nw[1]],c=d.getDay(),du=(t-c+7)%7||7;d.setDate(d.getDate()+du);}
     const dm=text.match(/(\d{1,2})月(\d{1,2})[日号]?/); if(dm){d.setMonth(parseInt(dm[1])-1);d.setDate(parseInt(dm[2]));}
-    let h=0,m=0; const tm=text.match(/(\d{1,2})[点:：](\d{1,2})?/);
+    let h=ref.getHours(),m=ref.getMinutes(); const tm=text.match(/(\d{1,2})[点:：](\d{1,2})?/);
     if(tm){h=parseInt(tm[1]);m=tm[2]?parseInt(tm[2]):0;if(/(下午|晚上)/.test(text)&&h<12)h+=12;}
     if(/半/.test(text)&&m===0)m=30;
     d.setHours(h,m,0,0); return d;
@@ -427,19 +386,21 @@ const HUD = ({ objectives, events, todayTodos, onAddObj, onEditObj, onDeleteObj,
                     </button>
                 </div>
 
-                {/* 3D 球体 OKR 展示 */}
-                <div className="flex items-center justify-center gap-5 mb-3">
-                    {objectives.map(o => <ObjSphere key={o.id} o={o} size={58}/>)}
-                    {objectives.length===0 && (
-                        <div className="text-[10px] py-4" style={{color:'var(--text-tertiary)'}}>还没有目标，输入 "/目标 名称" 创建</div>
-                    )}
-                    {/* 添加按钮 */}
-                    <div className="flex flex-col items-center gap-1.5 cursor-pointer select-none" onClick={onAddObj}>
-                        <div className="rounded-full flex items-center justify-center transition-colors"
-                            style={{width:58,height:58,border:'1px dashed rgba(139,127,184,0.25)'}}>
-                            <Ic.Plus/>
+                {/* 3D 球体 OKR 展示 — 水平可滑动 */}
+                <div className="overflow-x-auto no-scrollbar -mx-4 px-4 mb-3">
+                    <div className="flex items-center justify-center gap-5 min-w-min">
+                        {objectives.map(o => <ObjSphere key={o.id} o={o} size={58}/>)}
+                        {objectives.length===0 && (
+                            <div className="text-[10px] py-4" style={{color:'var(--text-tertiary)'}}>还没有目标，输入 "/目标 名称" 创建</div>
+                        )}
+                        {/* 添加按钮 */}
+                        <div className="flex flex-col items-center gap-1.5 cursor-pointer select-none" onClick={onAddObj}>
+                            <div className="rounded-full flex items-center justify-center transition-colors"
+                                style={{width:58,height:58,border:'1px dashed rgba(139,127,184,0.25)'}}>
+                                <Ic.Plus/>
+                            </div>
+                            <span className="text-[9px]" style={{color:'var(--text-tertiary)'}}>新建</span>
                         </div>
-                        <span className="text-[9px]" style={{color:'var(--text-tertiary)'}}>新建</span>
                     </div>
                 </div>
 
@@ -497,6 +458,17 @@ const EventCard = ({ event, objectives, onConfirm, onUpdate, onDelete }) => {
                     <div className="text-[10px] mb-2" style={{color:'var(--text-tertiary)'}}>编辑</div>
                     <textarea className="w-full glass-light p-3 text-sm outline-none resize-none h-20 font-light rounded-xl" style={{color:'var(--text-primary)'}}
                         value={editData.raw_content} onChange={e=>setEditData({...editData,raw_content:e.target.value})}/>
+                    <div className="mt-2">
+                        <label className="text-[10px] block mb-1" style={{color:'var(--text-tertiary)'}}>时间</label>
+                        <input type="datetime-local" className="w-full glass-light p-2 text-sm outline-none rounded-xl" style={{color:'var(--text-primary)'}}
+                            value={(()=>{const d=new Date(editData.timeline_time);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;})()}
+                            onChange={e=>{const v=e.target.value;if(v){const d=new Date(v);setEditData({...editData,timeline_time:d.toISOString()});}}}/>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                        <input type="checkbox" id={`done-${editData.id}`} className="w-4 h-4 rounded" style={{accentColor:'var(--accent-400)'}}
+                            checked={editData.status==='done'} onChange={e=>setEditData({...editData,status:e.target.checked?'done':'pending'})}/>
+                        <label htmlFor={`done-${editData.id}`} className="text-xs select-none" style={{color:'var(--text-secondary)'}}>已完成</label>
+                    </div>
                     <div className="flex gap-2 mt-2">
                         <select className="flex-1 glass-light px-3 py-2 text-xs outline-none rounded-xl" style={{color:'var(--text-secondary)'}}
                             value={editData.objective_id||''} onChange={e=>setEditData({...editData,objective_id:e.target.value||null})}>

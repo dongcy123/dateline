@@ -146,7 +146,7 @@ export default function HomeScreen() {
 
     // Future events (shown above NOW)
     let lastDate = '';
-    [...filteredFuture].reverse().forEach((e) => {
+    [...filteredFuture].forEach((e) => {
       const d = new Date(e.timeline_time);
       const ds = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       if (ds !== lastDate) {

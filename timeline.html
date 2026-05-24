@@ -82,89 +82,154 @@ const todayStr = () => tsDay(new Date());
 // 存储: Supabase + localStorage 双写
 // ==========================================
 const EV_KEY = 'kw_events_v3', OBJ_KEY = 'kw_obj_v3';
-const load = k => { try { const r=localStorage.getItem(k); return r?JSON.parse(r):null; }catch{ return null; } };
-const save = (k,v) => { try { localStorage.setItem(k,JSON.stringify(v)); }catch{} };
+let _storageOk = null; // null=未检测, true=可用, false=不可用
 
-// Supabase 客户端
+const storageAvailable = () => {
+  if (_storageOk !== null) return _storageOk;
+  try {
+    const testKey = '__kw_storage_test__';
+    localStorage.setItem(testKey, '1');
+    const result = localStorage.getItem(testKey);
+    localStorage.removeItem(testKey);
+    _storageOk = result === '1';
+  } catch { _storageOk = false; }
+  if (!_storageOk) console.warn('[Storage] localStorage 不可用 — 请检查 Safari 隐私设置，或使用 Chrome。数据仅通过 Supabase 持久化。');
+  return _storageOk;
+};
+
+const load = k => {
+  if (!storageAvailable()) return null;
+  try { const r=localStorage.getItem(k); return r?JSON.parse(r):null; }catch{ return null; }
+};
+const save = (k,v) => {
+  if (!storageAvailable()) return false;
+  try { localStorage.setItem(k,JSON.stringify(v)); return true; }catch{ return false; }
+};
+
+// Supabase 客户端 — SDK + REST 双通道
 const SB_URL = 'https://gduqrtzoggpjyifxvzxy.supabase.co';
 const SB_KEY = 'sb_publishable_8q1OXyDCIo6wcn82ReOa4w_-3azo0lH';
 let sb = null;
+let sbInitErr = null;
+
 try {
     if (typeof supabase !== 'undefined' && supabase.createClient) {
         sb = supabase.createClient(SB_URL, SB_KEY);
-        console.log('[Supabase] connected');
+        console.log('[Supabase] SDK connected');
+    } else {
+        sbInitErr = 'Supabase SDK 未加载 (CDN 被拦截?)';
+        console.warn('[Supabase] SDK not loaded');
     }
-} catch(e) { console.log('[Supabase] not available, using localStorage only'); }
+} catch(e) {
+    sbInitErr = 'Supabase 初始化失败: ' + (e.message || e);
+    console.warn('[Supabase] init error:', e.message);
+}
 
-// 从 Supabase 加载数据
+// REST API 直达 (不依赖 SDK, 更可靠)
+const sbRest = async (method, table, body) => {
+    const headers = {
+        'apikey': SB_KEY,
+        'Authorization': 'Bearer ' + SB_KEY,
+        'Content-Type': 'application/json',
+        'Prefer': method === 'POST' ? 'return=minimal' : 'return=representation'
+    };
+    const url = `${SB_URL}/rest/v1/${table}`;
+    const opts = { method, headers };
+    if (body) opts.body = JSON.stringify(body);
+    if (method === 'PATCH' || method === 'DELETE') {
+        opts.headers['Prefer'] = 'return=minimal';
+    }
+    try {
+        const r = await fetch(url, opts);
+        if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
+        return { ok: true, data: method === 'GET' ? await r.json() : null };
+    } catch(e) {
+        return { ok: false, error: e.message };
+    }
+};
+
+// 从 Supabase 加载数据 (优先 SDK, 回退 REST)
 const loadFromSB = async () => {
+    // 先用 REST 加载 (更可靠)
+    const [evR, objR] = await Promise.all([
+        sbRest('GET', 'timeline_events?order=timeline_time.desc'),
+        sbRest('GET', 'objectives?order=created_at.asc')
+    ]);
+    if (evR.ok || objR.ok) {
+        console.log(`[SB:REST] loaded ${(evR.data||[]).length} events, ${(objR.data||[]).length} objectives`);
+        return { events: evR.data || [], objectives: objR.data || [] };
+    }
+    // 回退 SDK
     if (!sb) return null;
     try {
         const [evRes, objRes] = await Promise.all([
             sb.from('timeline_events').select('*').order('timeline_time', { ascending: false }),
             sb.from('objectives').select('*').order('created_at', { ascending: true })
         ]);
-        if (evRes.error) console.warn('[SB] events:', evRes.error.message);
-        if (objRes.error) console.warn('[SB] objectives:', objRes.error.message);
-        return {
-            events: evRes.data || [],
-            objectives: objRes.data || []
-        };
+        if (evRes.error) console.warn('[SB:SDK] events:', evRes.error.message);
+        if (objRes.error) console.warn('[SB:SDK] objectives:', objRes.error.message);
+        console.log(`[SB:SDK] loaded ${(evRes.data||[]).length} events, ${(objRes.data||[]).length} objectives`);
+        return { events: evRes.data || [], objectives: objRes.data || [] };
     } catch(e) {
-        console.warn('[SB] load error:', e.message);
+        console.warn('[SB:SDK] load error:', e.message);
         return null;
     }
 };
 
-// 写入事件到 Supabase
+// 写入事件到 Supabase (REST 直达 + SDK 兜底)
 const saveEventToSB = async (ev) => {
-    if (!sb) return;
+    const body = {
+        id: ev.id, timeline_time: ev.timeline_time, record_time: ev.record_time,
+        raw_content: ev.raw_content, type: ev.type, status: ev.status,
+        objective_id: ev.objective_id || null, ai_metadata: ev.ai_metadata || {}
+    };
+    const r = await sbRest('POST', 'timeline_events', body);
+    if (r.ok) { console.log('[SB:REST] event saved'); return true; }
+    console.warn('[SB:REST] save event failed:', r.error);
+    // 回退 SDK
+    if (!sb) return false;
     try {
-        const { error } = await sb.from('timeline_events').upsert({
-            id: ev.id,
-            timeline_time: ev.timeline_time,
-            record_time: ev.record_time,
-            raw_content: ev.raw_content,
-            type: ev.type,
-            status: ev.status,
-            objective_id: ev.objective_id || null,
-            ai_metadata: ev.ai_metadata || {}
-        });
-        if (error) console.warn('[SB] save event:', error.message);
-    } catch(e) { console.warn('[SB] save event error:', e.message); }
+        const { error } = await sb.from('timeline_events').upsert(body);
+        if (error) { console.warn('[SB:SDK] save event:', error.message); return false; }
+        console.log('[SB:SDK] event saved');
+        return true;
+    } catch(e) { console.warn('[SB:SDK] save event error:', e.message); return false; }
 };
 
 // 删除事件从 Supabase
 const deleteEventFromSB = async (id) => {
+    const r = await sbRest('DELETE', `timeline_events?id=eq.${encodeURIComponent(id)}`);
+    if (r.ok) { console.log('[SB:REST] event deleted'); return; }
     if (!sb) return;
     try {
         const { error } = await sb.from('timeline_events').delete().eq('id', id);
-        if (error) console.warn('[SB] delete event:', error.message);
-    } catch(e) { console.warn('[SB] delete event error:', e.message); }
+        if (error) console.warn('[SB:SDK] delete event:', error.message);
+    } catch(e) { console.warn('[SB:SDK] delete event error:', e.message); }
 };
 
 // 写入目标到 Supabase
 const saveObjToSB = async (obj) => {
-    if (!sb) return;
+    const body = { id: obj.id, title: obj.title, target: obj.target, current: obj.current, color: obj.color };
+    const r = await sbRest('POST', 'objectives', body);
+    if (r.ok) { console.log('[SB:REST] obj saved'); return true; }
+    console.warn('[SB:REST] save obj failed:', r.error);
+    if (!sb) return false;
     try {
-        const { error } = await sb.from('objectives').upsert({
-            id: obj.id,
-            title: obj.title,
-            target: obj.target,
-            current: obj.current,
-            color: obj.color
-        });
-        if (error) console.warn('[SB] save obj:', error.message);
-    } catch(e) { console.warn('[SB] save obj error:', e.message); }
+        const { error } = await sb.from('objectives').upsert(body);
+        if (error) { console.warn('[SB:SDK] save obj:', error.message); return false; }
+        return true;
+    } catch(e) { console.warn('[SB:SDK] save obj error:', e.message); return false; }
 };
 
 // 删除目标从 Supabase
 const deleteObjFromSB = async (id) => {
+    const r = await sbRest('DELETE', `objectives?id=eq.${encodeURIComponent(id)}`);
+    if (r.ok) { console.log('[SB:REST] obj deleted'); return; }
     if (!sb) return;
     try {
         const { error } = await sb.from('objectives').delete().eq('id', id);
-        if (error) console.warn('[SB] delete obj:', error.message);
-    } catch(e) { console.warn('[SB] delete obj error:', e.message); }
+        if (error) console.warn('[SB:SDK] delete obj:', error.message);
+    } catch(e) { console.warn('[SB:SDK] delete obj error:', e.message); }
 };
 
 const MOCK_OBJS = [];
@@ -587,10 +652,10 @@ const Omnibox = ({ onSubmitText, isProcessing }) => {
 // ==========================================
 const App = () => {
     // 支持 ?reset 参数强制清除旧数据
-    if (window.location.search.includes('reset')) {
+    if (window.location.search.includes('reset') && storageAvailable()) {
         localStorage.removeItem(EV_KEY);
         localStorage.removeItem(OBJ_KEY);
-        console.log('localStorage cleared — using mock data');
+        console.log('localStorage cleared');
     }
     const [events,setEvents]=useState(()=>{const d=load(EV_KEY);return(d&&d.length)?d:MOCK_EVENTS;});
     const [objectives,setObjectives]=useState(()=>{const d=load(OBJ_KEY);return(d&&d.length)?d:MOCK_OBJS;});
@@ -600,7 +665,11 @@ const App = () => {
     const [selectedDate,setSelectedDate]=useState(null);
     const [toast,setToast]=useState(null);
     const [objEditor,setObjEditor]=useState(null); // null | {objective}|true (=新建)
+    const [storageWarn,setStorageWarn]=useState(false);
     const feedRef=useRef(null); const nowRef=useRef(null);
+
+    // 启动时检测 localStorage 可用性
+    useEffect(()=>{ if(!storageAvailable()) setStorageWarn(true); },[]);
 
     // 启动时从 Supabase 加载数据
     useEffect(()=>{
@@ -619,8 +688,8 @@ const App = () => {
             }
         })();
     },[]);
-    useEffect(()=>{save(EV_KEY,events);},[events]);
-    useEffect(()=>{save(OBJ_KEY,objectives);},[objectives]);
+    useEffect(()=>{const ok=save(EV_KEY,events); if(!ok && events.length>0) setStorageWarn(true);},[events]);
+    useEffect(()=>{const ok=save(OBJ_KEY,objectives); if(!ok && objectives.length>0) setStorageWarn(true);},[objectives]);
     useEffect(()=>{nowRef.current?.scrollIntoView({behavior:'auto',block:'center'});},[]);
 
     const toast_ = msg => { setToast(msg); setTimeout(()=>setToast(null),2500); };
@@ -650,7 +719,9 @@ const App = () => {
         if(/^\/目标[：:]\s*(.+)/.test(text)||/^\/obj[：:]\s*(.+)/i.test(text)){
             const m=text.match(/^(?:\/目标|\/obj)[：:]\s*(.+)/);
             const title=m[1].trim();
-            setObjectives(prev=>[...prev,{id:uid(),title,target:100,current:0,color:OBJ_PALETTE[Math.floor(Math.random()*OBJ_PALETTE.length)]}]);
+            const newObj = {id:uid(),title,target:100,current:0,color:OBJ_PALETTE[Math.floor(Math.random()*OBJ_PALETTE.length)]};
+            setObjectives(prev=>[...prev,newObj]);
+            saveObjToSB(newObj);
             toast_(`目标「${title}」已创建`); return;
         }
 
@@ -658,7 +729,9 @@ const App = () => {
         try {
             let aiRes; try{aiRes=await callAI(text,objectives);}catch(e){aiRes=localParse(text);}
             if(aiRes.type==='objective'){
-                setObjectives(prev=>[...prev,{id:uid(),title:aiRes.ai_metadata.title,target:100,current:0,color:aiRes.ai_metadata.color||OBJ_PALETTE[Math.floor(Math.random()*OBJ_PALETTE.length)]}]);
+                const aiObj = {id:uid(),title:aiRes.ai_metadata.title,target:100,current:0,color:aiRes.ai_metadata.color||OBJ_PALETTE[Math.floor(Math.random()*OBJ_PALETTE.length)]};
+                setObjectives(prev=>[...prev,aiObj]);
+                saveObjToSB(aiObj);
                 toast_(`AI 创建目标「${aiRes.ai_metadata.title}」`); setProcessing(false); return;
             }
             let tl=aiRes.timeline_time?new Date(aiRes.timeline_time):null;
@@ -666,7 +739,7 @@ const App = () => {
             const oid=aiRes.objective_id||matchObj(text,objectives);
             const ev={id:uid(),timeline_time:tl.toISOString(),record_time:new Date().toISOString(),raw_content:text,type:aiRes.type||'note',status:'pending',objective_id:oid||undefined,ai_metadata:aiRes.ai_metadata||{}};
             setEvents(prev=>[ev,...prev]);
-            saveEventToSB(ev);
+            const sbOk = await saveEventToSB(ev);
             if(oid&&(aiRes.ai_metadata?.progress_delta||0)>0){
                 setObjectives(prev=>{
                     const updated=prev.map(o=>o.id===oid?{...o,current:o.current+(aiRes.ai_metadata.progress_delta||0)}:o);
@@ -676,7 +749,12 @@ const App = () => {
                 });
             }
             const on=objectives.find(o=>o.id===oid);
-            toast_(`${TYPE_LABELS[ev.type]} · ${fmtDate(tl)} ${fmtTime(tl)}${on?' → '+on.title:''}`);
+            const locOk = storageAvailable();
+            const tags = [];
+            if (!locOk) tags.push('本地存储不可用');
+            if (!sbOk) tags.push('未同步到云端');
+            const suffix = tags.length > 0 ? ' (' + tags.join('，') + ')' : '';
+            toast_(`${TYPE_LABELS[ev.type]} · ${fmtDate(tl)} ${fmtTime(tl)}${on?' → '+on.title:''}${suffix}`);
         }catch(e){toast_('⚠ '+(e.message||'出错'));}
         finally{setProcessing(false);setTimeout(()=>nowRef.current?.scrollIntoView({behavior:'smooth',block:'center'}),100);}
     };
@@ -773,6 +851,7 @@ const App = () => {
         <div className="relative h-full w-full flex flex-col">
             <div className="absolute inset-0 beige-bg z-0"></div>
             {toast&&<div className="fixed top-20 left-1/2 -translate-x-1/2 z-[80] animate-in"><div className="glass-strong px-5 py-2.5 text-xs font-light tracking-wide rounded-xl" style={{color:'var(--text-primary)',boxShadow:'var(--shadow-card)'}}>{toast}</div></div>}
+            {storageWarn&&<div className="fixed top-16 left-1/2 -translate-x-1/2 z-[90] animate-in" style={{maxWidth:'90vw'}}><div className="glass-strong px-5 py-2.5 text-xs font-light tracking-wide rounded-xl text-center" style={{color:'var(--color-error)',boxShadow:'var(--shadow-card)',border:'1px solid rgba(196,128,128,0.3)'}}>Safari 隐私设置阻止了本地存储。<br/>数据仅保存在 Supabase 云端，关闭页面后新数据可能丢失。<br/>建议使用 Chrome 访问，或在 Safari 设置中关闭「阻止所有 Cookie」。</div></div>}
             {objEditor!==null&&<ObjEditor objective={objEditor===true?null:objEditor} onSave={saveObj} onClose={()=>setObjEditor(null)}/>}
 
             <HUD objectives={objectives} events={events} todayTodos={todayTodos} onAddObj={()=>setObjEditor(true)} onEditObj={o=>setObjEditor(o)} onDeleteObj={deleteObj} onFilterObj={setActiveFilter} activeFilter={activeFilter} selectedDate={selectedDate} onSelectDate={setSelectedDate} isOpen={hudOpen} onToggle={()=>setHudOpen(!hudOpen)}/>

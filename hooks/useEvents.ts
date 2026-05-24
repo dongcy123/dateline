@@ -29,7 +29,28 @@ function getSB() {
 let AsyncStorage: any = null;
 try { AsyncStorage = require('@react-native-async-storage/async-storage').default; } catch {}
 
+let _storageAvailable: boolean | null = null;
+function checkStorage() {
+  if (_storageAvailable !== null) return _storageAvailable;
+  try {
+    if (AsyncStorage) {
+      _storageAvailable = true;
+    } else if (typeof localStorage !== 'undefined') {
+      const testKey = '__kw_storage_test__';
+      localStorage.setItem(testKey, '1');
+      const result = localStorage.getItem(testKey);
+      localStorage.removeItem(testKey);
+      _storageAvailable = result === '1';
+    } else {
+      _storageAvailable = false;
+    }
+  } catch { _storageAvailable = false; }
+  if (!_storageAvailable) console.warn('[Storage] 本地存储不可用，仅通过 Supabase 持久化');
+  return _storageAvailable;
+}
+
 async function load(key: string, fallback: any) {
+  if (!checkStorage()) return fallback;
   try {
     if (AsyncStorage) { const r = await AsyncStorage.getItem(key); if (r) return JSON.parse(r); }
     if (typeof localStorage !== 'undefined') { const r = localStorage.getItem(key); if (r) return JSON.parse(r); }
@@ -38,11 +59,13 @@ async function load(key: string, fallback: any) {
 }
 
 async function persist(key: string, data: any) {
+  if (!checkStorage()) return false;
   try {
     const raw = JSON.stringify(data);
-    if (AsyncStorage) await AsyncStorage.setItem(key, raw);
-    if (typeof localStorage !== 'undefined') localStorage.setItem(key, raw);
+    if (AsyncStorage) { await AsyncStorage.setItem(key, raw); return true; }
+    if (typeof localStorage !== 'undefined') { localStorage.setItem(key, raw); return true; }
   } catch {}
+  return false;
 }
 
 async function syncToSB(table: string, data: any) {

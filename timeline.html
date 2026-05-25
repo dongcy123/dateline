@@ -547,28 +547,29 @@ const EventCard = ({ event, objectives, onConfirm, onUpdate, onDelete }) => {
                             <option value="note">笔记</option><option value="todo">待办</option>
                         </select>
                     </div>
-                    {/* 关键节点 — 仅关联目标时显示 */}
-                    {editData.objective_id && (
-                        <div className="mt-2 space-y-2">
-                            <div className="flex items-center gap-2">
-                                <input type="checkbox" id={`kn-${editData.id}`} className="w-4 h-4 rounded" style={{accentColor:'var(--accent-400)'}}
-                                    checked={editData.is_key_node||false} onChange={e=>{
-                                        const newKn = e.target.checked;
-                                        setEditData({...editData, is_key_node: newKn, ai_metadata: {...editData.ai_metadata, progress_delta: newKn ? (editData.ai_metadata?.progress_delta||1) : 0}});
-                                    }}/>
-                                <label htmlFor={`kn-${editData.id}`} className="text-xs select-none font-medium" style={{color:editData.is_key_node?'var(--accent-500)':'var(--text-secondary)'}}>关键节点</label>
-                                {editData.is_key_node && <span className="text-[9px]" style={{color:'var(--text-tertiary)'}}>贡献目标进度</span>}
-                            </div>
-                            {editData.is_key_node && (
-                                <div>
-                                    <label className="text-[10px] block mb-1" style={{color:'var(--text-tertiary)'}}>贡献值</label>
-                                    <input type="number" className="w-24 glass-light p-2 text-sm outline-none rounded-xl" style={{color:'var(--text-primary)'}}
-                                        value={editData.ai_metadata?.progress_delta||0} min={0}
-                                        onChange={e=>setEditData({...editData, ai_metadata: {...editData.ai_metadata, progress_delta: parseInt(e.target.value)||0}})}/>
-                                </div>
-                            )}
+                    {/* 关键节点 */}
+                    <div className="mt-2 space-y-2">
+                        <div className="flex items-center gap-2">
+                            <input type="checkbox" id={`kn-${editData.id}`} className="w-4 h-4 rounded" style={{accentColor:'var(--accent-400)', opacity: editData.objective_id ? 1 : 0.4}}
+                                checked={editData.is_key_node||false} disabled={!editData.objective_id}
+                                onChange={e=>{
+                                    if(!editData.objective_id) return;
+                                    const newKn = e.target.checked;
+                                    setEditData({...editData, is_key_node: newKn, ai_metadata: {...editData.ai_metadata, progress_delta: newKn ? (editData.ai_metadata?.progress_delta||1) : 0}});
+                                }}/>
+                            <label htmlFor={`kn-${editData.id}`} className="text-xs select-none font-medium" style={{color:editData.is_key_node?'var(--accent-500)':'var(--text-secondary)'}}>关键节点</label>
+                            {editData.is_key_node && <span className="text-[9px]" style={{color:'var(--text-tertiary)'}}>贡献目标进度</span>}
+                            {!editData.objective_id && <span className="text-[9px]" style={{color:'var(--text-tertiary)',opacity:0.6}}>请先关联目标</span>}
                         </div>
-                    )}
+                        {editData.is_key_node && editData.objective_id && (
+                            <div>
+                                <label className="text-[10px] block mb-1" style={{color:'var(--text-tertiary)'}}>贡献值 (progress_delta)</label>
+                                <input type="number" className="w-24 glass-light p-2 text-sm outline-none rounded-xl" style={{color:'var(--text-primary)'}}
+                                    value={editData.ai_metadata?.progress_delta||0} min={0}
+                                    onChange={e=>setEditData({...editData, ai_metadata: {...editData.ai_metadata, progress_delta: parseInt(e.target.value)||0}})}/>
+                            </div>
+                        )}
+                    </div>
                     <div className="flex gap-2 mt-2">
                         <button onClick={()=>{onUpdate(event.id,editData);setEditing(false);}} className="flex-1 text-xs py-2 font-medium rounded-xl" style={{backgroundColor:'var(--accent-300)',color:'var(--text-inverse)'}}>保存</button>
                         <button onClick={()=>setEditing(false)} className="flex-1 text-xs py-2 rounded-xl" style={{color:'var(--text-tertiary)'}}>取消</button>

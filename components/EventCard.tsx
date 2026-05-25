@@ -78,41 +78,42 @@ export function EventCard({ event, onConfirm, onUpdate, onDelete }: EventCardPro
             <Text style={styles.statusLabel}>已完成</Text>
           </View>
 
-          {/* 关键节点 — 仅关联目标时显示 */}
-          {editData.objective_id ? (
-            <View style={{ marginBottom: 12 }}>
-              <View style={styles.statusRow}>
-                <TouchableOpacity
-                  style={[styles.checkbox, editData.is_key_node && styles.checkboxChecked]}
-                  onPress={() => {
-                    const newKn = !editData.is_key_node;
-                    setEditData({
-                      ...editData,
-                      is_key_node: newKn,
-                      ai_metadata: { ...editData.ai_metadata, progress_delta: newKn ? (editData.ai_metadata?.progress_delta || 1) : 0 }
-                    });
-                  }}
-                >
-                  {editData.is_key_node && <Text style={styles.checkmark}>✓</Text>}
-                </TouchableOpacity>
-                <Text style={[styles.statusLabel, editData.is_key_node && { color: '#8B7FB8', fontWeight: '600' }]}>关键节点</Text>
-                {editData.is_key_node && <Text style={{ fontSize: 10, color: '#8B84A0' }}>贡献目标进度</Text>}
-              </View>
-              {editData.is_key_node && (
-                <View style={{ marginTop: 8 }}>
-                  <Text style={styles.timeLabel}>贡献值</Text>
-                  <TextInput
-                    style={styles.editInputSmall}
-                    value={String(editData.ai_metadata?.progress_delta || 0)}
-                    onChangeText={(t) => setEditData({ ...editData, ai_metadata: { ...editData.ai_metadata, progress_delta: parseInt(t) || 0 } })}
-                    keyboardType="numeric"
-                    placeholder="0"
-                    placeholderTextColor="#52525b"
-                  />
-                </View>
-              )}
+          {/* 关键节点 */}
+          <View style={{ marginBottom: 12 }}>
+            <View style={styles.statusRow}>
+              <TouchableOpacity
+                style={[styles.checkbox, editData.is_key_node && styles.checkboxChecked, !editData.objective_id && { opacity: 0.35 }]}
+                onPress={() => {
+                  if (!editData.objective_id) return;
+                  const newKn = !editData.is_key_node;
+                  setEditData({
+                    ...editData,
+                    is_key_node: newKn,
+                    ai_metadata: { ...editData.ai_metadata, progress_delta: newKn ? (editData.ai_metadata?.progress_delta || 1) : 0 }
+                  });
+                }}
+                disabled={!editData.objective_id}
+              >
+                {editData.is_key_node && <Text style={styles.checkmark}>✓</Text>}
+              </TouchableOpacity>
+              <Text style={[styles.statusLabel, editData.is_key_node && { color: '#8B7FB8', fontWeight: '600' }]}>关键节点</Text>
+              {editData.is_key_node && <Text style={{ fontSize: 10, color: '#8B84A0' }}>贡献目标进度</Text>}
+              {!editData.objective_id && <Text style={{ fontSize: 10, color: '#8B84A0', opacity: 0.6 }}>请先关联目标</Text>}
             </View>
-          ) : null}
+            {editData.is_key_node && editData.objective_id && (
+              <View style={{ marginTop: 8 }}>
+                <Text style={styles.timeLabel}>贡献值 (progress_delta)</Text>
+                <TextInput
+                  style={styles.editInputSmall}
+                  value={String(editData.ai_metadata?.progress_delta || 0)}
+                  onChangeText={(t) => setEditData({ ...editData, ai_metadata: { ...editData.ai_metadata, progress_delta: parseInt(t) || 0 } })}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#52525b"
+                />
+              </View>
+            )}
+          </View>
 
           <View style={styles.editActions}>
             <TouchableOpacity

@@ -148,9 +148,10 @@ export const useEventStore = create<EventStore>((set, get) => ({
     syncToSB('timeline_events', {
       id: event.id, timeline_time: event.timeline_time, record_time: event.record_time,
       raw_content: event.raw_content, type: event.type, status: event.status,
-      objective_id: event.objective_id || null, ai_metadata: event.ai_metadata || {}
+      objective_id: event.objective_id || null, is_key_node: event.is_key_node || false,
+      ai_metadata: event.ai_metadata || {}
     });
-    if (event.objective_id && (event.ai_metadata?.progress_delta || 0) > 0) {
+    if (event.objective_id && event.is_key_node && (event.ai_metadata?.progress_delta || 0) > 0) {
       get().addProgress(event.objective_id, event.ai_metadata.progress_delta || 0);
     }
   },
@@ -160,7 +161,12 @@ export const useEventStore = create<EventStore>((set, get) => ({
       const events = s.events.map(e => e.id === id ? { ...e, status: 'done' as const } : e);
       persist(EV_KEY, events);
       const ev = events.find(e => e.id === id);
-      if (ev) syncToSB('timeline_events', ev);
+      if (ev) syncToSB('timeline_events', {
+        id: ev.id, timeline_time: ev.timeline_time, record_time: ev.record_time,
+        raw_content: ev.raw_content, type: ev.type, status: ev.status,
+        objective_id: ev.objective_id || null, is_key_node: ev.is_key_node || false,
+        ai_metadata: ev.ai_metadata || {}
+      });
       return { events };
     });
   },
@@ -170,16 +176,51 @@ export const useEventStore = create<EventStore>((set, get) => ({
       const events = s.events.map(e => e.id === id ? { ...e, ...u } : e);
       persist(EV_KEY, events);
       const ev = events.find(e => e.id === id);
-      if (ev) syncToSB('timeline_events', ev);
+      if (ev) {
+        syncToSB('timeline_events', {
+          id: ev.id, timeline_time: ev.timeline_time, record_time: ev.record_time,
+          raw_content: ev.raw_content, type: ev.type, status: ev.status,
+          objective_id: ev.objective_id || null, is_key_node: ev.is_key_node || false,
+          ai_metadata: ev.ai_metadata || {}
+        });
+        // 关键节点: 重新计算目标进度
+        if (ev.objective_id) {
+          const knTotal = events
+            .filter(e => e.objective_id === ev.objective_id && e.is_key_node)
+            .reduce((sum, e) => sum + (e.ai_metadata?.progress_delta || 0), 0);
+          const objectives = s.objectives.map(o =>
+            o.id === ev.objective_id ? { ...o, current: Math.min(knTotal, o.target) } : o
+          );
+          const obj = objectives.find(o => o.id === ev.objective_id);
+          if (obj) syncToSB('objectives', obj);
+          persist(OBJ_KEY, objectives);
+          return { events, objectives };
+        }
+      }
       return { events };
     });
   },
 
   deleteEvent: async (id) => {
+    const ev = get().events.find(e => e.id === id);
     set(s => {
+      let objectives = s.objectives;
+      // 如果删除的是关键节点，重新计算目标进度
+      if (ev?.is_key_node && ev?.objective_id) {
+        const events = s.events.filter(e => e.id !== id);
+        const knTotal = events
+          .filter(e => e.objective_id === ev.objective_id && e.is_key_node)
+          .reduce((sum, e) => sum + (e.ai_metadata?.progress_delta || 0), 0);
+        objectives = s.objectives.map(o =>
+          o.id === ev.objective_id ? { ...o, current: Math.min(knTotal, o.target) } : o
+        );
+        const obj = objectives.find(o => o.id === ev.objective_id);
+        if (obj) syncToSB('objectives', obj);
+        persist(OBJ_KEY, objectives);
+      }
       const events = s.events.filter(e => e.id !== id);
       persist(EV_KEY, events);
-      return { events };
+      return { events, objectives };
     });
     deleteFromSB('timeline_events', id);
   },

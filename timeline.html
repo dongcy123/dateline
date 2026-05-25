@@ -126,21 +126,21 @@ try {
 }
 
 // REST API 直达 (不依赖 SDK, 更可靠)
-const sbRest = async (method, table, body) => {
+const sbRest = async (method, table, body, opts = {}) => {
+    const preferParts = [];
+    if (opts.upsert) preferParts.push('resolution=merge-duplicates');
+    preferParts.push(method === 'GET' ? 'return=representation' : 'return=minimal');
     const headers = {
         'apikey': SB_KEY,
         'Authorization': 'Bearer ' + SB_KEY,
         'Content-Type': 'application/json',
-        'Prefer': method === 'POST' ? 'return=minimal' : 'return=representation'
+        'Prefer': preferParts.join(', ')
     };
     const url = `${SB_URL}/rest/v1/${table}`;
-    const opts = { method, headers };
-    if (body) opts.body = JSON.stringify(body);
-    if (method === 'PATCH' || method === 'DELETE') {
-        opts.headers['Prefer'] = 'return=minimal';
-    }
+    const fetchOpts = { method, headers };
+    if (body) fetchOpts.body = JSON.stringify(body);
     try {
-        const r = await fetch(url, opts);
+        const r = await fetch(url, fetchOpts);
         if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
         return { ok: true, data: method === 'GET' ? await r.json() : null };
     } catch(e) {
@@ -181,9 +181,10 @@ const saveEventToSB = async (ev) => {
     const body = {
         id: ev.id, timeline_time: ev.timeline_time, record_time: ev.record_time,
         raw_content: ev.raw_content, type: ev.type, status: ev.status,
-        objective_id: ev.objective_id || null, ai_metadata: ev.ai_metadata || {}
+        objective_id: ev.objective_id || null, is_key_node: ev.is_key_node || false,
+        ai_metadata: ev.ai_metadata || {}
     };
-    const r = await sbRest('POST', 'timeline_events', body);
+    const r = await sbRest('POST', 'timeline_events', body, { upsert: true });
     if (r.ok) { console.log('[SB:REST] event saved'); return true; }
     console.warn('[SB:REST] save event failed:', r.error);
     // 回退 SDK
@@ -210,7 +211,7 @@ const deleteEventFromSB = async (id) => {
 // 写入目标到 Supabase
 const saveObjToSB = async (obj) => {
     const body = { id: obj.id, title: obj.title, target: obj.target, current: obj.current, color: obj.color };
-    const r = await sbRest('POST', 'objectives', body);
+    const r = await sbRest('POST', 'objectives', body, { upsert: true });
     if (r.ok) { console.log('[SB:REST] obj saved'); return true; }
     console.warn('[SB:REST] save obj failed:', r.error);
     if (!sb) return false;
@@ -247,9 +248,10 @@ const AI_PROMPT = `你是《川上》个人战略执行系统的 AI 助手。分
 - note: 记录、想法、观察、已完成的事
 
 输出格式:
-{"type":"todo|note","objective_id":null,"ai_metadata":{"task":"摘要","progress_delta":数字,"tags":["标签"]},"timeline_time":"ISO 8601 或 null"}
+{"type":"todo|note","objective_id":null,"is_key_node":false,"ai_metadata":{"task":"摘要","progress_delta":数字,"tags":["标签"]},"timeline_time":"ISO 8601 或 null"}
 
 progress_delta: 已完成且有数量→提取数字(如"标注10张"→10); 待做→0; 无数字→1
+is_key_node: 里程碑级关键节点为 true (如"完成第3章"、"发布v1.0")，普通待办为 false
 如果是创建目标/标签，type="objective"，ai_metadata={"title":"目标名","color":"#hex"}
 
 时间: "下周三下午3点"→推算日期, ISO 8601格式, 无法提取则null
@@ -545,6 +547,28 @@ const EventCard = ({ event, objectives, onConfirm, onUpdate, onDelete }) => {
                             <option value="note">笔记</option><option value="todo">待办</option>
                         </select>
                     </div>
+                    {/* 关键节点 — 仅关联目标时显示 */}
+                    {editData.objective_id && (
+                        <div className="mt-2 space-y-2">
+                            <div className="flex items-center gap-2">
+                                <input type="checkbox" id={`kn-${editData.id}`} className="w-4 h-4 rounded" style={{accentColor:'var(--accent-400)'}}
+                                    checked={editData.is_key_node||false} onChange={e=>{
+                                        const newKn = e.target.checked;
+                                        setEditData({...editData, is_key_node: newKn, ai_metadata: {...editData.ai_metadata, progress_delta: newKn ? (editData.ai_metadata?.progress_delta||1) : 0}});
+                                    }}/>
+                                <label htmlFor={`kn-${editData.id}`} className="text-xs select-none font-medium" style={{color:editData.is_key_node?'var(--accent-500)':'var(--text-secondary)'}}>关键节点</label>
+                                {editData.is_key_node && <span className="text-[9px]" style={{color:'var(--text-tertiary)'}}>贡献目标进度</span>}
+                            </div>
+                            {editData.is_key_node && (
+                                <div>
+                                    <label className="text-[10px] block mb-1" style={{color:'var(--text-tertiary)'}}>贡献值</label>
+                                    <input type="number" className="w-24 glass-light p-2 text-sm outline-none rounded-xl" style={{color:'var(--text-primary)'}}
+                                        value={editData.ai_metadata?.progress_delta||0} min={0}
+                                        onChange={e=>setEditData({...editData, ai_metadata: {...editData.ai_metadata, progress_delta: parseInt(e.target.value)||0}})}/>
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <div className="flex gap-2 mt-2">
                         <button onClick={()=>{onUpdate(event.id,editData);setEditing(false);}} className="flex-1 text-xs py-2 font-medium rounded-xl" style={{backgroundColor:'var(--accent-300)',color:'var(--text-inverse)'}}>保存</button>
                         <button onClick={()=>setEditing(false)} className="flex-1 text-xs py-2 rounded-xl" style={{color:'var(--text-tertiary)'}}>取消</button>
@@ -558,11 +582,11 @@ const EventCard = ({ event, objectives, onConfirm, onUpdate, onDelete }) => {
 
     return (
         <div className="group mb-6 cursor-pointer transition-all duration-300 hover:scale-[1.01]" onClick={()=>setEditing(true)}>
-            {/* 彩色连接点 — 继承目标颜色 */}
+            {/* 彩色连接点 — 关键节点发光更强 */}
             <div className="flex justify-center mb-2">
                 <div className="w-2 h-2 rounded-full transition-shadow duration-300" style={{
                     backgroundColor: accent,
-                    boxShadow: `0 0 8px ${accent}55, 0 0 16px ${accent}20`
+                    boxShadow: event.is_key_node ? `0 0 12px ${accent}88, 0 0 24px ${accent}40` : `0 0 8px ${accent}55, 0 0 16px ${accent}20`
                 }}/>
             </div>
             {/* 玻璃卡片 */}
@@ -573,6 +597,7 @@ const EventCard = ({ event, objectives, onConfirm, onUpdate, onDelete }) => {
                 <div className="flex items-baseline gap-2 mb-1.5">
                     <span className="text-[10px] tabular-nums" style={{color:'var(--text-tertiary)'}}>{fmtTime(d)}</span>
                     {obj && <span className="text-[9px] truncate max-w-[140px] font-medium" style={{color:accent}}>{obj.title}</span>}
+                    {event.is_key_node && <span className="text-[9px] px-1.5 py-0.5 rounded-md font-medium" style={{backgroundColor:accent+'20',color:accent}}>关键节点</span>}
                     <span className="text-[9px]" style={{color:'var(--text-tertiary)'}}>{TYPE_LABELS[event.type]}</span>
                 </div>
                 <p className="text-sm leading-relaxed mb-1 font-light" style={{color:pending?'var(--text-secondary)':'var(--text-primary)'}}>{event.raw_content}</p>
@@ -737,10 +762,11 @@ const App = () => {
             let tl=aiRes.timeline_time?new Date(aiRes.timeline_time):null;
             if(!tl||isNaN(tl.getTime())) tl=parseTime(text);
             const oid=aiRes.objective_id||matchObj(text,objectives);
-            const ev={id:uid(),timeline_time:tl.toISOString(),record_time:new Date().toISOString(),raw_content:text,type:aiRes.type||'note',status:'pending',objective_id:oid||undefined,ai_metadata:aiRes.ai_metadata||{}};
+            const isKeyNode = aiRes.is_key_node || false;
+            const ev={id:uid(),timeline_time:tl.toISOString(),record_time:new Date().toISOString(),raw_content:text,type:aiRes.type||'note',status:'pending',objective_id:oid||undefined,is_key_node:isKeyNode,ai_metadata:aiRes.ai_metadata||{}};
             setEvents(prev=>[ev,...prev]);
             const sbOk = await saveEventToSB(ev);
-            if(oid&&(aiRes.ai_metadata?.progress_delta||0)>0){
+            if(oid&&isKeyNode&&(aiRes.ai_metadata?.progress_delta||0)>0){
                 setObjectives(prev=>{
                     const updated=prev.map(o=>o.id===oid?{...o,current:o.current+(aiRes.ai_metadata.progress_delta||0)}:o);
                     const obj=updated.find(o=>o.id===oid);
@@ -773,11 +799,41 @@ const App = () => {
             const updated=prev.map(e=>e.id===id?{...e,...data}:e);
             const ev=updated.find(e=>e.id===id);
             if(ev) saveEventToSB(ev);
+            // 关键节点: 同步目标进度
+            if(ev && ev.is_key_node && ev.objective_id){
+                const oid = ev.objective_id;
+                const knTotal = updated
+                    .filter(e=>e.objective_id===oid && e.is_key_node)
+                    .reduce((sum,e)=>sum+(e.ai_metadata?.progress_delta||0), 0);
+                setObjectives(prev2=>{
+                    const objUpdated=prev2.map(o=>o.id===oid?{...o,current:Math.min(knTotal, o.target)}:o);
+                    const obj=objUpdated.find(o=>o.id===oid);
+                    if(obj) saveObjToSB(obj);
+                    return objUpdated;
+                });
+            }
             return updated;
         });
     };
     const deleteEvent=id=>{
-        setEvents(prev=>prev.filter(e=>e.id!==id));
+        setEvents(prev=>{
+            const ev = prev.find(e=>e.id===id);
+            const updated = prev.filter(e=>e.id!==id);
+            // 如果删除的是关键节点，重新计算目标进度
+            if(ev?.is_key_node && ev?.objective_id){
+                const oid = ev.objective_id;
+                const knTotal = updated
+                    .filter(e=>e.objective_id===oid && e.is_key_node)
+                    .reduce((sum,e)=>sum+(e.ai_metadata?.progress_delta||0), 0);
+                setObjectives(prev2=>{
+                    const objUpdated=prev2.map(o=>o.id===oid?{...o,current:Math.min(knTotal, o.target)}:o);
+                    const obj=objUpdated.find(o=>o.id===oid);
+                    if(obj) saveObjToSB(obj);
+                    return objUpdated;
+                });
+            }
+            return updated;
+        });
         deleteEventFromSB(id);
         toast_('已删除');
     };
@@ -857,7 +913,7 @@ const App = () => {
             <HUD objectives={objectives} events={events} todayTodos={todayTodos} onAddObj={()=>setObjEditor(true)} onEditObj={o=>setObjEditor(o)} onDeleteObj={deleteObj} onFilterObj={setActiveFilter} activeFilter={activeFilter} selectedDate={selectedDate} onSelectDate={setSelectedDate} isOpen={hudOpen} onToggle={()=>setHudOpen(!hudOpen)}/>
 
             <div ref={feedRef} className="flex-1 overflow-y-auto no-scrollbar flow-scroll pt-10 pb-32 px-5 z-10 relative"
-                style={{paddingTop:hudOpen?'400px':'190px',transition:'padding-top 0.5s ease-out'}}>
+                style={{paddingTop:hudOpen?'400px':'216px',transition:'padding-top 0.5s ease-out'}}>
                 <div className="max-w-lg mx-auto">
                     {(activeFilter||selectedDate)&&<div className="flex items-center gap-2 mb-4 text-[10px]">
                         <span style={{color:'var(--text-tertiary)'}}>筛选:</span>

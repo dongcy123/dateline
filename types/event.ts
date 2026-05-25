@@ -24,6 +24,7 @@ export interface TimelineEvent {
   type: EventType;
   status: EventStatus;
   objective_id?: string;
+  is_key_node?: boolean;
   ai_metadata: AIMetadata;
   created_at?: string;
 }

@@ -40,11 +40,13 @@ export async function processWithAI(request: AIProxyRequest): Promise<TimelineEv
 
     return {
       id: generateId(),
-      timeline_time: new Date().toISOString(),
+      timeline_time: response.timeline_time || new Date().toISOString(),
       record_time: new Date().toISOString(),
       raw_content: request.text || (request.image_url ? '[图片凭证]' : ''),
       type: response.type,
       status: 'pending',
+      objective_id: response.objective_id || undefined,
+      is_key_node: response.is_key_node || false,
       ai_metadata: response.ai_metadata,
     };
   } catch (err) {
@@ -144,5 +146,7 @@ const SYSTEM_PROMPT = `你是一个个人管理助手。分析用户输入并返
 规则：
 1. 如果是任务、待办、提醒 → type: "todo"，ai_metadata: {"task": "任务名", "priority": "high|normal|low"}
 2. 其他记录、想法、笔记 → type: "note"，ai_metadata: {"summary": "摘要"}
+3. is_key_node: 里程碑级关键节点为 true (如"完成第3章"、"发布v1.0")，普通待办为 false
+4. progress_delta: 关键节点的贡献值，已完成且有数量→提取数字，待做→0
 
 只返回 JSON，不要任何额外文字。`;

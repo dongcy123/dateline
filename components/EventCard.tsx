@@ -78,6 +78,42 @@ export function EventCard({ event, onConfirm, onUpdate, onDelete }: EventCardPro
             <Text style={styles.statusLabel}>已完成</Text>
           </View>
 
+          {/* 关键节点 — 仅关联目标时显示 */}
+          {editData.objective_id ? (
+            <View style={{ marginBottom: 12 }}>
+              <View style={styles.statusRow}>
+                <TouchableOpacity
+                  style={[styles.checkbox, editData.is_key_node && styles.checkboxChecked]}
+                  onPress={() => {
+                    const newKn = !editData.is_key_node;
+                    setEditData({
+                      ...editData,
+                      is_key_node: newKn,
+                      ai_metadata: { ...editData.ai_metadata, progress_delta: newKn ? (editData.ai_metadata?.progress_delta || 1) : 0 }
+                    });
+                  }}
+                >
+                  {editData.is_key_node && <Text style={styles.checkmark}>✓</Text>}
+                </TouchableOpacity>
+                <Text style={[styles.statusLabel, editData.is_key_node && { color: '#8B7FB8', fontWeight: '600' }]}>关键节点</Text>
+                {editData.is_key_node && <Text style={{ fontSize: 10, color: '#8B84A0' }}>贡献目标进度</Text>}
+              </View>
+              {editData.is_key_node && (
+                <View style={{ marginTop: 8 }}>
+                  <Text style={styles.timeLabel}>贡献值</Text>
+                  <TextInput
+                    style={styles.editInputSmall}
+                    value={String(editData.ai_metadata?.progress_delta || 0)}
+                    onChangeText={(t) => setEditData({ ...editData, ai_metadata: { ...editData.ai_metadata, progress_delta: parseInt(t) || 0 } })}
+                    keyboardType="numeric"
+                    placeholder="0"
+                    placeholderTextColor="#52525b"
+                  />
+                </View>
+              )}
+            </View>
+          ) : null}
+
           <View style={styles.editActions}>
             <TouchableOpacity
               style={styles.saveBtn}
@@ -106,12 +142,19 @@ export function EventCard({ event, onConfirm, onUpdate, onDelete }: EventCardPro
       </View>
 
       <View style={[styles.card, isPending && styles.cardPending]}>
-        {/* Type badge */}
+        {/* Type badge + key node */}
         <View style={styles.cardHeader}>
-          <View style={[styles.badge, { backgroundColor: colors.bg, borderColor: colors.border }]}>
-            <Text style={[styles.badgeText, { color: colors.text }]}>
-              {TYPE_LABELS[event.type] || event.type}
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={[styles.badge, { backgroundColor: colors.bg, borderColor: colors.border }]}>
+              <Text style={[styles.badgeText, { color: colors.text }]}>
+                {TYPE_LABELS[event.type] || event.type}
+              </Text>
+            </View>
+            {event.is_key_node && (
+              <View style={[styles.badge, { backgroundColor: 'rgba(139,127,184,0.12)', borderColor: 'rgba(139,127,184,0.25)' }]}>
+                <Text style={[styles.badgeText, { color: '#8B7FB8' }]}>关键节点</Text>
+              </View>
+            )}
           </View>
           <Text style={styles.dateText}>{formatDate(date)}</Text>
         </View>

@@ -3,6 +3,8 @@ import type { EventType } from './event';
 /** Standardized AI proxy response — both text and vision engines must return this shape */
 export interface AIProxyResponse {
   type: EventType;
+  objective_id?: string | null;
+  is_key_node?: boolean;
   ai_metadata: Record<string, unknown>;
   /** ISO 8601 timestamp extracted from natural language, null = use current time */
   timeline_time?: string | null;

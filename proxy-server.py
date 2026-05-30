@@ -9,9 +9,9 @@
 import json, os, re, http.server, urllib.request, ssl, traceback
 from datetime import datetime, timezone, timedelta
 
-DEEPSEEK_KEY = os.environ.get("DEEPSEEK_KEY", "sk-59667e37ac864780895095182443388f")
+DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY")
 DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions"
-VISION_KEY = os.environ.get("VISION_KEY", "sk-9069631b201a4f5997a10682ff399dba")
+VISION_KEY = os.environ.get("VISION_API_KEY")
 VISION_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions"
 VISION_MODEL = "qwen-vl-max"
 

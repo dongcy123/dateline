@@ -15,8 +15,8 @@ const MIME = {
 };
 
 // AI Proxy — DeepSeek text + Qwen-VL vision
-const DEEPSEEK_KEY = process.env.DEEPSEEK_KEY || 'sk-59667e37ac864780895095182443388f';
-const VISION_KEY = process.env.VISION_KEY || 'sk-9069631b201a4f5997a10682ff399dba';
+const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY;
+const VISION_KEY = process.env.VISION_API_KEY;
 const VISION_MODEL = process.env.VISION_MODEL || 'qwen-vl-max';
 const VISION_BASE_URL = process.env.VISION_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 

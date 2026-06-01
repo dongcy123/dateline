@@ -288,6 +288,50 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Supabase REST proxy — 浏览器在国内无法直连 Supabase
+  if (url.pathname.startsWith('/api/sb/')) {
+    const sbPath = url.pathname.replace('/api/sb', '') + url.search;
+    const sbUrl = 'https://gduqrtzoggpjyifxvzxy.supabase.co' + sbPath;
+
+    const proxyReq = async () => {
+      try {
+        const headers = {
+          'apikey': 'sb_publishable_8q1OXyDCIo6wcn82ReOa4w_-3azo0lH',
+          'Authorization': 'Bearer sb_publishable_8q1OXyDCIo6wcn82ReOa4w_-3azo0lH',
+        };
+        if (req.method === 'POST' || req.method === 'PATCH' || req.method === 'PUT') {
+          headers['Content-Type'] = req.headers['content-type'] || 'application/json';
+        }
+
+        const fetchOpts = { method: req.method, headers };
+        if (req.method !== 'GET' && req.method !== 'HEAD') {
+          // Read body for non-GET requests
+          fetchOpts.body = await new Promise((resolve, reject) => {
+            let data = '';
+            req.on('data', chunk => data += chunk);
+            req.on('end', () => resolve(data));
+            req.on('error', reject);
+          });
+        }
+
+        const upstream = await fetch(sbUrl, fetchOpts);
+        const resBody = await upstream.text();
+
+        res.writeHead(upstream.status, {
+          'Content-Type': upstream.headers.get('content-type') || 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        });
+        res.end(resBody);
+      } catch (err) {
+        console.error('[sb-proxy]', err.message);
+        res.writeHead(502, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: { code: 'proxy_error', message: err.message } }));
+      }
+    };
+    proxyReq();
+    return;
+  }
+
   // Health check
   if (url.pathname === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });

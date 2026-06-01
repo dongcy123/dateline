@@ -56,7 +56,7 @@ window.Kawa.sbRest = async (method, table, body, opts = {}) => {
     'Content-Type': 'application/json',
     'Prefer': preferParts.join(', ')
   };
-  const url = SB_URL + '/rest/v1/' + table;
+  const url = '/api/sb/rest/v1/' + table;
   const fetchOpts = { method, headers };
   if (body) fetchOpts.body = JSON.stringify(body);
   try {
@@ -163,12 +163,17 @@ window.Kawa.uploadImage = async (file) => {
     img.src = URL.createObjectURL(file);
   });
 
-  const formData = new FormData();
-  formData.append('', compressed, filename);
-
   const res = await fetch(
-    SB_URL + '/storage/v1/object/' + bucket + '/' + filename,
-    { method: 'POST', headers: { 'Authorization': 'Bearer ' + SB_KEY }, body: formData }
+    '/api/sb/storage/v1/object/' + bucket + '/' + filename,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + SB_KEY,
+        'Content-Type': 'image/jpeg',
+        'x-upsert': 'true'
+      },
+      body: compressed
+    }
   );
 
   if (!res.ok) {
@@ -177,7 +182,7 @@ window.Kawa.uploadImage = async (file) => {
   }
 
   const data = await res.json();
-  const publicUrl = SB_URL + '/storage/v1/object/public/' + bucket + '/' + filename;
+  const publicUrl = '/api/sb/storage/v1/object/public/' + bucket + '/' + filename;
   console.log('[Storage] Image uploaded:', publicUrl);
   return publicUrl;
 };

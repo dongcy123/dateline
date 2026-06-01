@@ -14,7 +14,7 @@ window.Kawa.ChatOverlay = ({ isOpen, onClose, onEventsGenerated, toast }) => {
   React.useEffect(() => {
     if (isOpen && messages.length === 0) {
       // 开场白
-      setMessages([{ role: 'assistant', content: '你好，我是川上 AI。说说你今天做了什么，或者有什么计划？我会帮你梳理成清晰的时间线卡片。' }]);
+      setMessages([{ role: 'assistant', content: '你好，我是川上 AI。说说你今天做了什么，或者有什么计划？我会帮你梳理成清晰的时间线卡片。', _forApi: false }]);
     }
   }, [isOpen]);
 
@@ -31,10 +31,12 @@ window.Kawa.ChatOverlay = ({ isOpen, onClose, onEventsGenerated, toast }) => {
     setIsThinking(true);
 
     try {
+      // 只发 user 消息之后的记录（跳过开头 assistant 欢迎语）
+      const history = updated.filter(m => m._forApi !== false).map(m => ({ role: m.role, content: m.content }));
       const r = await fetch('/api/proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: 'chat', history: updated.map(m => ({ role: m.role, content: m.content })) }),
+        body: JSON.stringify({ engine: 'chat', history }),
       });
       if (r.ok) {
         const data = await r.json();

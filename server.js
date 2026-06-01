@@ -249,9 +249,7 @@ const server = http.createServer((req, res) => {
           try {
             parsed = JSON.parse(content);
           } catch {
-            parsed = JSON.parse(content.replace(/```json
-?/g, '').replace(/```
-?/g, '').trim());
+            parsed = JSON.parse(content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
           }
           const events = (parsed.events || []).map(e => ({
             ...e,
@@ -267,9 +265,7 @@ const server = http.createServer((req, res) => {
         try {
           result = JSON.parse(content);
         } catch {
-          result = JSON.parse(content.replace(/```json
-?/g, '').replace(/```
-?/g, '').trim());
+          result = JSON.parse(content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
         }
 
         // 服务端时间增强

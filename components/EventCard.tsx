@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, StyleSheet, Platform } from 'react-native';
 import type { TimelineEvent } from '@/types/event';
+import { useEventStore } from '@/hooks/useEvents';
+
+const MONO = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
 
 interface EventCardProps {
   event: TimelineEvent;
@@ -22,6 +25,8 @@ export function EventCard({ event, onConfirm, onUpdate, onDelete }: EventCardPro
   const isPending = event.status === 'pending';
   const date = new Date(event.timeline_time);
   const colors = isPending ? PENDING_COLORS : (TYPE_COLORS[event.type] || TYPE_COLORS.note);
+  const objectives = useEventStore((s) => s.objectives);
+  const linkedObj = event.objective_id ? objectives.find((o) => o.id === event.objective_id) : undefined;
 
   const formatTime = (d: Date) =>
     `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -138,11 +143,14 @@ export function EventCard({ event, onConfirm, onUpdate, onDelete }: EventCardPro
     <TouchableOpacity style={styles.row} onPress={() => setEditing(true)} activeOpacity={0.7}>
       <View style={styles.timeline}>
         <Text style={styles.timeText}>{formatTime(date)}</Text>
-        <View style={[styles.dot, isPending && styles.dotPending, { backgroundColor: isPending ? '#3b82f6' : '#3f3f46' }]} />
+        <View style={[styles.dot, isPending ? styles.dotPending : styles.dotDone]} />
         <View style={styles.line} />
       </View>
 
       <View style={[styles.card, isPending && styles.cardPending]}>
+        {linkedObj && (
+          <View style={[styles.objStrip, { backgroundColor: linkedObj.color }]} />
+        )}
         {/* Type badge + key node */}
         <View style={styles.cardHeader}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -193,62 +201,65 @@ export function EventCard({ event, onConfirm, onUpdate, onDelete }: EventCardPro
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', width: '100%' },
   timeline: { width: 48, alignItems: 'center' },
-  timeText: { fontSize: 11, color: '#8B84A0', marginBottom: 4 },
-  dot: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: '#F5F0EB', zIndex: 10 },
-  dotPending: { shadowColor: '#8B7FB8', shadowOpacity: 0.5, shadowRadius: 6 },
-  line: { width: 1, flex: 1, backgroundColor: 'rgba(184,181,224,0.2)', marginTop: -1 },
+  timeText: { fontSize: 10, color: '#8B84A0', marginBottom: 4, fontFamily: MONO },
+  dot: { width: 6, height: 6, borderRadius: 3, zIndex: 10 },
+  dotDone: { backgroundColor: '#3f3f46' },
+  dotPending: { backgroundColor: '#8B7FB8' },
+  line: { width: 1, flex: 1, backgroundColor: 'rgba(0,0,0,0.06)', marginTop: -1 },
   card: {
     flex: 1,
     marginLeft: 12,
     marginBottom: 20,
     padding: 16,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.40)',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
     borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.30)',
-    shadowColor: '#8B7FB8',
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
+    borderColor: 'rgba(0,0,0,0.08)',
+    overflow: 'hidden',
   },
   cardPending: {
-    backgroundColor: 'rgba(255,255,255,0.50)',
-    borderColor: 'rgba(139,127,184,0.30)',
-    shadowColor: '#8B7FB8',
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(0,0,0,0.10)',
+    borderWidth: 1,
+  },
+  objStrip: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 2,
   },
   cardEditing: {
-    borderColor: '#B8B5E0',
-    backgroundColor: 'rgba(255,255,255,0.55)',
+    borderColor: 'rgba(0,0,0,0.12)',
+    backgroundColor: '#FFFFFF',
   },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   badge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12, borderWidth: 1 },
   badgeText: { fontSize: 10, fontWeight: '600' },
-  dateText: { fontSize: 10, color: '#8B84A0' },
+  dateText: { fontSize: 10, color: '#8B84A0', fontFamily: MONO },
   content: { fontSize: 14, color: '#2D2838', marginBottom: 12, lineHeight: 20 },
-  metadataBox: { backgroundColor: 'rgba(232,228,244,0.3)', borderRadius: 8, padding: 10, marginBottom: 12, borderWidth: 0.5, borderColor: 'rgba(184,181,224,0.2)' },
-  metaLabel: { fontSize: 10, color: '#8B84A0', marginBottom: 4 },
+  metadataBox: { backgroundColor: 'rgba(0,0,0,0.02)', borderRadius: 8, padding: 10, marginBottom: 12, borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.06)' },
+  metaLabel: { fontSize: 10, color: '#8B84A0', marginBottom: 4, fontFamily: MONO },
   metaTags: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   metaTag: { backgroundColor: 'rgba(232,228,244,0.5)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   metaTagText: { fontSize: 11, color: '#5C5670' },
-  confirmBtn: { backgroundColor: '#B8B5E0', borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
-  confirmText: { color: '#F5F0EB', fontSize: 14, fontWeight: '500' },
+  confirmBtn: { backgroundColor: '#1a1a1a', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  confirmText: { color: '#FFFFFF', fontSize: 13, fontWeight: '500', fontFamily: MONO },
   editHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   editTitle: { color: '#2D2838', fontSize: 13 },
   deleteBtn: { backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   deleteText: { color: '#f87171', fontSize: 12 },
-  editInput: { backgroundColor: 'rgba(255,255,255,0.25)', borderWidth: 0.5, borderColor: 'rgba(184,181,224,0.2)', borderRadius: 12, padding: 12, color: '#2D2838', fontSize: 14, minHeight: 80, textAlignVertical: 'top', marginBottom: 12 },
-  timeLabel: { fontSize: 10, color: '#8B84A0', marginBottom: 4 },
-  editInputSmall: { backgroundColor: 'rgba(255,255,255,0.25)', borderWidth: 0.5, borderColor: 'rgba(184,181,224,0.2)', borderRadius: 12, padding: 10, color: '#2D2838', fontSize: 13, marginBottom: 12 },
+  editInput: { backgroundColor: 'rgba(0,0,0,0.02)', borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.08)', borderRadius: 10, padding: 12, color: '#1a1a1a', fontSize: 14, minHeight: 80, textAlignVertical: 'top', marginBottom: 12 },
+  timeLabel: { fontSize: 10, color: '#8B84A0', marginBottom: 4, fontFamily: MONO },
+  editInputSmall: { backgroundColor: 'rgba(0,0,0,0.02)', borderWidth: 0.5, borderColor: 'rgba(0,0,0,0.08)', borderRadius: 10, padding: 10, color: '#1a1a1a', fontSize: 13, marginBottom: 12, fontFamily: MONO },
   statusRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: 'rgba(184,181,224,0.4)', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.25)' },
   checkboxChecked: { backgroundColor: '#B8B5E0', borderColor: '#8B7FB8' },
   checkmark: { color: '#F5F0EB', fontSize: 14, fontWeight: '700' },
   statusLabel: { fontSize: 13, color: '#5C5670' },
   editActions: { flexDirection: 'row', gap: 8 },
-  saveBtn: { flex: 1, backgroundColor: '#B8B5E0', borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
-  saveText: { color: '#F5F0EB', fontSize: 13, fontWeight: '500' },
-  cancelBtn: { flex: 1, backgroundColor: 'rgba(232,228,244,0.5)', borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
+  saveBtn: { flex: 1, backgroundColor: '#1a1a1a', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
+  saveText: { color: '#FFFFFF', fontSize: 13, fontWeight: '500', fontFamily: MONO },
+  cancelBtn: { flex: 1, backgroundColor: 'rgba(0,0,0,0.04)', borderRadius: 8, paddingVertical: 10, alignItems: 'center' },
   cancelText: { color: '#8B84A0', fontSize: 13 },
 });

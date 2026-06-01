@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Alert,
   Platform,
+  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HUDHeader } from '@/components/HUDHeader';
@@ -23,6 +24,7 @@ export default function HomeScreen() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const listRef = useRef<FlatList>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadEvents();
@@ -93,6 +95,11 @@ export default function HomeScreen() {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleExpandRequest = () => {
+    // Scroll to top to expand collapsed header
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
   const handleCameraPress = () => {
@@ -201,18 +208,20 @@ export default function HomeScreen() {
         events={events}
         selectedDate={selectedDate}
         onSelectDate={setSelectedDate}
+        scrollY={scrollY}
+        onExpandRequest={handleExpandRequest}
       />
 
       {/* Bi-directional Feed */}
-      <FlatList
-        ref={listRef}
+      <Animated.FlatList
+        ref={listRef as any}
         data={flatData}
         keyExtractor={(item, i) =>
           item.type === 'event' && item.event ? item.event.id : `${item.type}-${i}`
         }
         renderItem={renderFlatItem}
         contentContainerStyle={{
-          paddingTop: insets.top + 140,
+          paddingTop: insets.top + 190,
           paddingBottom: 120,
           paddingHorizontal: 16,
         }}
@@ -220,6 +229,11 @@ export default function HomeScreen() {
         initialNumToRender={15}
         maxToRenderPerBatch={10}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: false }
+        )}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={styles.emptyText}>还没有记录</Text>
@@ -258,12 +272,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     opacity: 0.8,
   },
-  dividerLine: { flex: 1, height: 0.5, backgroundColor: 'rgba(184,181,224,0.18)' },
+  dividerLine: { flex: 1, height: 0.5, backgroundColor: 'rgba(0,0,0,0.06)' },
   dividerPill: {
-    backgroundColor: 'rgba(255,255,255,0.40)',
+    backgroundColor: 'rgba(0,0,0,0.03)',
     borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.30)',
-    borderRadius: 12,
+    borderColor: 'rgba(0,0,0,0.06)',
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 4,
     marginHorizontal: 16,
@@ -275,22 +289,19 @@ const styles = StyleSheet.create({
     paddingVertical: 32,
     opacity: 0.9,
   },
-  nowLine: { flex: 1, height: 0.5, backgroundColor: 'rgba(184,181,224,0.25)' },
+  nowLine: { flex: 1, height: 0.5, backgroundColor: 'rgba(0,0,0,0.08)' },
   nowPill: {
-    backgroundColor: 'rgba(184,181,224,0.12)',
+    backgroundColor: 'rgba(0,0,0,0.04)',
     borderWidth: 0.5,
-    borderColor: 'rgba(184,181,224,0.3)',
-    borderRadius: 16,
+    borderColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 6,
     marginHorizontal: 16,
-    shadowColor: '#8B7FB8',
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
   },
   nowText: {
-    fontSize: 12,
-    color: '#8B7FB8',
+    fontSize: 11,
+    color: '#1a1a1a',
     fontWeight: '600',
     letterSpacing: 4,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',

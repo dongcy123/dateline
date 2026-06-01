@@ -23,6 +23,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",
     "expo": "~52.0.0",
+    "expo-asset": "~11.0.5",
     "expo-router": "~4.0.0",
     "expo-status-bar": "~2.0.0",
     "react": "18.3.1",
@@ -30,6 +31,7 @@
     "react-native-safe-area-context": "~5.0.0",
     "react-native-screens": "~4.4.0",
     "react-native-url-polyfill": "^2.0.0",
+    "react-native-web": "~0.19.13",
     "zustand": "^5.0.0"
   },
   "devDependencies": {

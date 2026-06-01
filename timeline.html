@@ -311,7 +311,7 @@ const Ic = {
 // ==========================================
 // HUD — 川上标题 + 3D球体OKR + 日历热力
 // ==========================================
-const HUD = ({ objectives, events, todayTodos, onAddObj, onEditObj, onDeleteObj, onFilterObj, activeFilter, selectedDate, onSelectDate, isOpen, onToggle }) => {
+const HUD = ({ objectives, events, todayTodos, onAddObj, onEditObj, onDeleteObj, onFilterObj, activeFilter, selectedDate, onSelectDate, isOpen, onToggle, collapsed, onExpandRequest }) => {
     const now = new Date();
     const year = now.getFullYear();
     const month = now.getMonth();
@@ -333,6 +333,15 @@ const HUD = ({ objectives, events, todayTodos, onAddObj, onEditObj, onDeleteObj,
         });
         return stats;
     }, [events, year, month]);
+
+    // 迷你圆圈 — 折叠态使用
+    const SmallCircle = ({ o }) => {
+        const pct = o.target > 0 ? Math.min((o.current/o.target)*100, 100) : 0;
+        return React.createElement('div', {className:'relative',style:{width:20,height:20}},
+            React.createElement('div', {className:'absolute inset-0 rounded-full',style:{border:`1.5px solid ${o.color}`}}),
+            React.createElement('div', {className:'absolute bottom-0 left-0 right-0 overflow-hidden',style:{height:`${pct}%`,backgroundColor:o.color,opacity:0.65,borderRadius:pct>98?'50%':'0 0 50% 50%'}})
+        );
+    };
 
     // OKR 进度球体 — 按百分比填色
     const ObjSphere = ({ o, size = 64 }) => {
@@ -437,40 +446,62 @@ const HUD = ({ objectives, events, todayTodos, onAddObj, onEditObj, onDeleteObj,
 
     return (
         <div className="fixed top-0 left-0 right-0 z-50">
-            <div className="glass-strong px-5 pt-8 pb-3" style={{borderBottom:'var(--border-header)'}}>
-                {/* 标题行 */}
-                <div className="flex justify-between items-end mb-4">
-                    <div>
-                        <h1 className="text-xl font-light tracking-[0.15em]" style={{color:'var(--text-primary)'}}>川上</h1>
-                        <p className="text-[9px] mt-0.5 tracking-widest" style={{color:'var(--text-tertiary)'}}>timeline · FrsionOS v2</p>
+            <div className="px-5 pt-4 pb-3" style={{background:'#fff',borderBottom:'var(--border-header)'}}>
+                {/* 标题行 + 折叠态迷你圆圈 */}
+                <div className="flex justify-between items-center">
+                    <h1 className="text-lg font-semibold tracking-[0.12em]" style={{color:'var(--text-primary)'}}>川上</h1>
+
+                    {/* 折叠态迷你圆圈 — 位于标题和按钮之间 */}
+                    <div className="flex-1 flex justify-center items-center"
+                        style={{
+                            opacity: collapsed ? 1 : 0,
+                            maxHeight: collapsed ? '40px' : '0px',
+                            transition: 'opacity 0.35s ease, max-height 0.35s ease',
+                            pointerEvents: collapsed ? 'auto' : 'none'
+                        }}
+                        onClick={(e) => { e.stopPropagation(); if (onExpandRequest) onExpandRequest(); }}>
+                        <div className="flex items-center gap-2.5 cursor-pointer">
+                            {objectives.slice(0,5).map(o => <SmallCircle key={o.id} o={o}/>)}
+                        </div>
                     </div>
-                    <button onClick={onToggle} className="text-[10px] transition-colors tracking-wider" style={{color:'var(--text-tertiary)'}}>
+
+                    <button onClick={onToggle} className="text-[10px] transition-colors tracking-wider whitespace-nowrap" style={{color:'var(--text-tertiary)'}}>
                         {isOpen?'收起日历':'展开日历'}
                     </button>
                 </div>
 
-                {/* 3D 球体 OKR 展示 — 水平可滑动 */}
-                <div className="overflow-x-auto no-scrollbar -mx-4 px-4 mb-3">
-                    <div className="flex items-center justify-center gap-5 min-w-min">
-                        {objectives.map(o => <ObjSphere key={o.id} o={o} size={58}/>)}
-                        {objectives.length===0 && (
-                            <div className="text-[10px] py-4" style={{color:'var(--text-tertiary)'}}>还没有目标，输入 "/目标 名称" 创建</div>
-                        )}
-                        {/* 添加按钮 */}
-                        <div className="flex flex-col items-center gap-1.5 cursor-pointer select-none" onClick={onAddObj}>
-                            <div className="rounded-full flex items-center justify-center transition-colors"
-                                style={{width:58,height:58,border:'1px dashed rgba(139,127,184,0.25)'}}>
-                                <Ic.Plus/>
+                {/* 展开区域：球体 + 进度 — 折叠时隐藏 */}
+                <div style={{
+                    maxHeight: collapsed ? '0px' : '300px',
+                    opacity: collapsed ? 0 : 1,
+                    overflow: 'hidden',
+                    transition: 'max-height 0.4s ease, opacity 0.3s ease, margin 0.35s ease',
+                    marginTop: collapsed ? '0px' : '12px',
+                    marginBottom: collapsed ? '0px' : '4px'
+                }}>
+                    {/* 3D 球体 OKR 展示 — 水平可滑动 */}
+                    <div className="overflow-x-auto no-scrollbar -mx-4 px-4 mb-3">
+                        <div className="flex items-center justify-center gap-5 min-w-min">
+                            {objectives.map(o => <ObjSphere key={o.id} o={o} size={58}/>)}
+                            {objectives.length===0 && (
+                                <div className="text-[10px] py-4" style={{color:'var(--text-tertiary)'}}>还没有目标，输入 "/目标 名称" 创建</div>
+                            )}
+                            {/* 添加按钮 */}
+                            <div className="flex flex-col items-center gap-1.5 cursor-pointer select-none" onClick={onAddObj}>
+                                <div className="rounded-full flex items-center justify-center transition-colors"
+                                    style={{width:58,height:58,border:'1px dashed rgba(139,127,184,0.25)'}}>
+                                    <Ic.Plus/>
+                                </div>
+                                <span className="text-[9px]" style={{color:'var(--text-tertiary)'}}>新建</span>
                             </div>
-                            <span className="text-[9px]" style={{color:'var(--text-tertiary)'}}>新建</span>
                         </div>
                     </div>
-                </div>
 
-                {/* 今日待办 */}
-                <div className="flex items-center justify-between text-[10px]">
-                    <span style={{color:'var(--text-tertiary)'}}>今日待办 <span style={{color:'var(--text-primary)',fontWeight:'500'}}>{todayTodos.done}/{todayTodos.total}</span></span>
-                    <span className="text-[9px]" style={{color:'var(--text-tertiary)',opacity:0.6}}>点击筛选 · 长按编辑</span>
+                    {/* 今日待办 */}
+                    <div className="flex items-center justify-between text-[10px]">
+                        <span style={{color:'var(--text-tertiary)'}}>今日待办 <span style={{color:'var(--text-primary)',fontWeight:'500',fontFamily:'"SF Mono","Menlo","Cascadia Code",monospace'}}>{todayTodos.done}/{todayTodos.total}</span></span>
+                        <span className="text-[9px]" style={{color:'var(--text-tertiary)',opacity:0.6}}>点击筛选 · 长按编辑</span>
+                    </div>
                 </div>
             </div>
 
@@ -686,6 +717,7 @@ const App = () => {
     const [selectedDate,setSelectedDate]=useState(null);
     const [toast,setToast]=useState(null);
     const [objEditor,setObjEditor]=useState(null); // null | {objective}|true (=新建)
+    const [collapsed,setCollapsed]=useState(false);
     const [storageWarn,setStorageWarn]=useState(false);
     const feedRef=useRef(null); const nowRef=useRef(null);
 
@@ -891,6 +923,7 @@ const App = () => {
             const rect = nowEl.getBoundingClientRect();
             const containerRect = el.getBoundingClientRect();
             setShowScrollBtn(rect.top < 0 || rect.top > containerRect.height);
+                setCollapsed(el.scrollTop > 60);
         };
         el.addEventListener('scroll', onScroll, {passive:true});
         return () => el.removeEventListener('scroll', onScroll);
@@ -906,10 +939,10 @@ const App = () => {
             {storageWarn&&<div className="fixed top-16 left-1/2 -translate-x-1/2 z-[90] animate-in" style={{maxWidth:'90vw'}}><div className="px-5 py-2.5 text-xs font-light tracking-wide rounded-xl text-center" style={{color:'var(--color-error)',background:'#fff',border:'1px solid rgba(196,128,128,0.3)'}}>Safari 隐私设置阻止了本地存储。<br/>数据仅保存在 Supabase 云端，关闭页面后新数据可能丢失。<br/>建议使用 Chrome 访问，或在 Safari 设置中关闭「阻止所有 Cookie」。</div></div>}
             {objEditor!==null&&<ObjEditor objective={objEditor===true?null:objEditor} onSave={saveObj} onClose={()=>setObjEditor(null)}/>}
 
-            <HUD objectives={objectives} events={events} todayTodos={todayTodos} onAddObj={()=>setObjEditor(true)} onEditObj={o=>setObjEditor(o)} onDeleteObj={deleteObj} onFilterObj={setActiveFilter} activeFilter={activeFilter} selectedDate={selectedDate} onSelectDate={setSelectedDate} isOpen={hudOpen} onToggle={()=>setHudOpen(!hudOpen)}/>
+            <HUD objectives={objectives} events={events} todayTodos={todayTodos} onAddObj={()=>setObjEditor(true)} onEditObj={o=>setObjEditor(o)} onDeleteObj={deleteObj} onFilterObj={setActiveFilter} activeFilter={activeFilter} selectedDate={selectedDate} onSelectDate={setSelectedDate} isOpen={hudOpen} onToggle={()=>setHudOpen(!hudOpen)} collapsed={collapsed} onExpandRequest={()=>{feedRef.current?.scrollTo({top:0,behavior:'smooth'});setCollapsed(false);}}/>
 
             <div ref={feedRef} className="flex-1 overflow-y-auto no-scrollbar flow-scroll pt-10 pb-32 px-5 z-10 relative"
-                style={{paddingTop:hudOpen?'380px':'200px',transition:'padding-top 0.5s ease-out'}}>
+                style={{paddingTop:hudOpen?'350px':'170px',transition:'padding-top 0.5s ease-out'}}>
                 <div className="max-w-lg mx-auto">
                     {(activeFilter||selectedDate)&&<div className="flex items-center gap-2 mb-4 text-[10px]">
                         <span style={{color:'var(--text-tertiary)'}}>筛选:</span>

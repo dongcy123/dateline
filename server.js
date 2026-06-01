@@ -213,6 +213,7 @@ const server = http.createServer((req, res) => {
         const isChat = engine === 'chat';
         const isExtract = engine === 'extract';
 
+        const t0 = Date.now();
         console.log(`[proxy] → ${engine}`);
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 25000);
@@ -222,6 +223,8 @@ const server = http.createServer((req, res) => {
         } finally {
           clearTimeout(timeout);
         }
+        const t1 = Date.now();
+        console.log(`[proxy] ${engine} upstream responded in ${t1 - t0}ms`);
         const aiText = await aiRes.text();
 
         if (!aiRes.ok) {

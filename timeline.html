@@ -337,9 +337,9 @@ const HUD = ({ objectives, events, todayTodos, onAddObj, onEditObj, onDeleteObj,
     // 迷你圆圈 — 折叠态使用
     const SmallCircle = ({ o }) => {
         const pct = o.target > 0 ? Math.min((o.current/o.target)*100, 100) : 0;
-        return React.createElement('div', {className:'relative',style:{width:20,height:20}},
-            React.createElement('div', {className:'absolute inset-0 rounded-full',style:{border:`1.5px solid ${o.color}`}}),
-            React.createElement('div', {className:'absolute bottom-0 left-0 right-0 overflow-hidden',style:{height:`${pct}%`,backgroundColor:o.color,opacity:0.65,borderRadius:pct>98?'50%':'0 0 50% 50%'}})
+        return React.createElement('div', {className:'relative',style:{width:20,height:20,borderRadius:'50%',overflow:'hidden'}},
+            React.createElement('div', {className:'absolute inset-0 rounded-full',style:{border:`1.5px solid ${o.color}`,zIndex:1}}),
+            React.createElement('div', {className:'absolute bottom-0 left-0 right-0',style:{height:`${pct}%`,backgroundColor:o.color,opacity:0.75}})
         );
     };
 
@@ -449,7 +449,7 @@ const HUD = ({ objectives, events, todayTodos, onAddObj, onEditObj, onDeleteObj,
             <div className="px-5 pt-4 pb-3" style={{background:'#fff',borderBottom:'var(--border-header)'}}>
                 {/* 标题行 + 折叠态迷你圆圈 */}
                 <div className="flex justify-between items-center">
-                    <h1 className="text-lg font-semibold tracking-[0.12em]" style={{color:'var(--text-primary)'}}>川上</h1>
+                    <h1 className="text-lg font-light tracking-[0.12em]" style={{color:'var(--text-primary)'}}>川上</h1>
 
                     {/* 折叠态迷你圆圈 — 位于标题和按钮之间 */}
                     <div className="flex-1 flex justify-center items-center"
@@ -546,7 +546,7 @@ const EventCard = ({ event, objectives, onConfirm, onUpdate, onDelete }) => {
         return (
             <div className="mb-8 animate-fade-in">
                 <div className="flex justify-center mb-2">
-                    <div className="w-2 h-2 rounded-full" style={{backgroundColor:accent`0 0 8px ${accent}55`}}/>
+                    <div className="w-2 h-2 rounded-full" style={{backgroundColor:accent}}/>
                 </div>
                 <div className="p-4" style={{background:'#fff',border:'var(--border-card)',borderRadius:'12px',borderLeft:`2px solid ${accent}`}}>
                     <div className="text-[10px] mb-2" style={{color:'var(--text-tertiary)'}}>编辑</div>

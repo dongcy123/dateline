@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 8765;
-const HTML_FILE = path.join(__dirname, 'timeline.html');
+const HTML_FILE = path.join(__dirname, 'index.html');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -150,10 +150,68 @@ const server = http.createServer((req, res) => {
             temperature: 0.3,
             response_format: { type: 'json_object' },
           });
+        } else if (engine === 'chat' && body.history) {
+          if (!DEEPSEEK_KEY) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ error: { code: 'api_key_missing', message: '未配置 DeepSeek API 密钥' } }));
+          }
+          const now = new Date();
+          const nowStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00+08:00`;
+          const chatMessages = [
+            { role: 'system', content: `你是《川上》个人战略执行系统的 AI 对谈助手。当前时间：${nowStr}。
+
+你的风格：简洁、温和、有洞察。每次回复控制在 2-4 句话。
+引导用户梳理今天做了什么、明天计划什么。当用户提到具体任务或事件时，主动询问是否需要提炼成时间线卡片。
+用户说"完成"或"就这样"时，提醒点击"完成提炼"按钮生成卡片。
+不要输出 JSON，只输出自然语言。` },
+            ...body.history
+          ];
+          targetUrl = 'https://api.deepseek.com/v1/chat/completions';
+          headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${DEEPSEEK_KEY}` };
+          targetBody = JSON.stringify({
+            model: 'deepseek-chat',
+            messages: chatMessages,
+            temperature: 0.7,
+          });
+        } else if (engine === 'extract' && body.history) {
+          if (!DEEPSEEK_KEY) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            return res.end(JSON.stringify({ error: { code: 'api_key_missing', message: '未配置 DeepSeek API 密钥' } }));
+          }
+          const now = new Date();
+          const nowStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00+08:00`;
+          const convoText = body.history.map(m => `${m.role === 'user' ? '用户' : 'AI'}: ${m.content}`).join('\n\n');
+          targetUrl = 'https://api.deepseek.com/v1/chat/completions';
+          headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${DEEPSEEK_KEY}` };
+          targetBody = JSON.stringify({
+            model: 'deepseek-chat',
+            messages: [
+              { role: 'system', content: `你是《川上》个人战略执行系统的提炼引擎。当前时间：${nowStr}。
+
+分析以下对话，从中提取所有值得沉淀的任务和笔记。返回严格 JSON：
+
+{"events":[{"type":"todo|note","raw_content":"对应用户原文","ai_metadata":{"task_title":"精炼12字标题","progress_delta":数字},"timeline_time":"ISO 8601 或 null"}]}
+
+规则：
+- task_title: 去口语化、动作导向，12 字以内，绝不复制原文
+- progress_delta: 已完成且有数量→提取数字，待做→0，无数字→1
+- timeline_time: 提取对话中提到的时间，无法提取则为 null
+- type: 待做/任务→"todo"，记录/已完成/想法→"note"
+- 无关闲聊、寒暄、情感安抚不要提取
+- 只返回 JSON，不要任何额外文字。` },
+              { role: 'user', content: convoText }
+            ],
+            temperature: 0.3,
+            response_format: { type: 'json_object' },
+          });
         } else {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ error: { code: 'bad_request', message: '需要提供 text 或 image_url' } }));
+          return res.end(JSON.stringify({ error: { code: 'bad_request', message: '需要提供 text, image_url 或 history' } }));
         }
+
+        console.log(`[proxy] → ${engine}`);
+        const isChat = engine === 'chat';
+        const isExtract = engine === 'extract';
 
         console.log(`[proxy] → ${engine}`);
         const aiRes = await fetch(targetUrl, { method: 'POST', headers, body: targetBody });
@@ -178,16 +236,45 @@ const server = http.createServer((req, res) => {
           return res.end(JSON.stringify({ error: { code: 'empty_response', message: 'AI 返回为空' } }));
         }
 
+        // Chat mode: return natural language reply as-is
+        if (isChat) {
+          console.log(`[proxy] ✓ chat → ${content.substring(0, 60)}...`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ reply: content }));
+        }
+
+        // Extract mode: parse JSON events array
+        if (isExtract) {
+          let parsed;
+          try {
+            parsed = JSON.parse(content);
+          } catch {
+            parsed = JSON.parse(content.replace(/```json
+?/g, '').replace(/```
+?/g, '').trim());
+          }
+          const events = (parsed.events || []).map(e => ({
+            ...e,
+            objective_id: e.objective_id || null
+          }));
+          console.log(`[proxy] ✓ extract → ${events.length} events`);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ events }));
+        }
+
+        // Text/Vision mode: parse single event JSON
         let result;
         try {
           result = JSON.parse(content);
         } catch {
-          result = JSON.parse(content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim());
+          result = JSON.parse(content.replace(/```json
+?/g, '').replace(/```
+?/g, '').trim());
         }
 
         // 服务端时间增强
         if (!result.timeline_time || result.timeline_time === 'null') {
-          const localTime = parseChineseTime(text);
+          const localTime = parseChineseTime(text || '');
           if (localTime) result.timeline_time = localTime;
         }
         if (!result.objective_id) result.objective_id = null;
@@ -195,6 +282,7 @@ const server = http.createServer((req, res) => {
         console.log(`[proxy] ✓ ${engine} → ${result.type} time=${result.timeline_time||'now'}`);
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(result));
+
       } catch (err) {
         console.error('[proxy] internal:', err.message);
         res.writeHead(500, { 'Content-Type': 'application/json' });

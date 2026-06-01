@@ -321,7 +321,18 @@ const App = () => {
         </button>
       )}
 
-      <Omnibox onSubmitText={handleSubmit} isProcessing={processing} onChatOpen={() => setChatOpen(true)} />
+      <Omnibox onSubmitText={handleSubmit} isProcessing={processing} onChatOpen={() => setChatOpen(true)}
+  onImageSubmit={async (imageUrl, caption) => {
+    const ev = {
+      id: uid(), timeline_time: new Date().toISOString(), record_time: new Date().toISOString(),
+      raw_content: caption || '[图片]', type: 'note', status: 'pending',
+      ai_metadata: { task_title: caption ? (caption.length > 12 ? caption.substring(0,11)+'…' : caption) : '图片记录', progress_delta: 0 },
+      image_url: imageUrl
+    };
+    setEvents(prev => [ev, ...prev]);
+    await saveEventToSB(ev);
+    toast_('图片已上传' + (caption ? ' · ' + caption.substring(0,20) : ''));
+  }} />
 
       <ChatOverlay isOpen={chatOpen} onClose={() => setChatOpen(false)} onEventsGenerated={handleChatEvents} toast={toast_} />
 

@@ -140,3 +140,44 @@ window.Kawa.deleteObjFromSB = async (id) => {
     if (error) console.warn('[SB:SDK] delete obj:', error.message);
   } catch (e) { console.warn('[SB:SDK] delete obj error:', e.message); }
 };
+
+// 图片上传到 Supabase Storage
+window.Kawa.uploadImage = async (file) => {
+  const ext = file.name.split('.').pop() || 'jpg';
+  const filename = window.Kawa.uid() + '.' + ext;
+  const bucket = 'event-images';
+
+  // 客户端压缩
+  const compressed = await new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const maxW = 1200;
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = h * (maxW / w); w = maxW; }
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(resolve, 'image/jpeg', 0.75);
+    };
+    img.src = URL.createObjectURL(file);
+  });
+
+  const formData = new FormData();
+  formData.append('', compressed, filename);
+
+  const res = await fetch(
+    SB_URL + '/storage/v1/object/' + bucket + '/' + filename,
+    { method: 'POST', headers: { 'Authorization': 'Bearer ' + SB_KEY }, body: formData }
+  );
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Upload failed: ' + res.status);
+  }
+
+  const data = await res.json();
+  const publicUrl = SB_URL + '/storage/v1/object/public/' + bucket + '/' + filename;
+  console.log('[Storage] Image uploaded:', publicUrl);
+  return publicUrl;
+};

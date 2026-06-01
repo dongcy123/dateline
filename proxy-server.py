@@ -24,7 +24,14 @@ SYSTEM_PROMPT = """你是《川上》个人战略执行系统的 AI 助手。分
 - note: 记录、想法、观察、已完成的事
 
 输出格式:
-{"type":"todo|note","objective_id":null,"ai_metadata":{"task":"摘要","progress_delta":数字,"tags":["标签"]},"timeline_time":"ISO 8601 或 null"}
+{"type":"todo|note","objective_id":null,"ai_metadata":{"task_title":"精炼短标题","progress_delta":数字},"timeline_time":"ISO 8601 或 null"}
+
+task_title 规则（最重要）:
+- 将用户输入精炼为去口语化、动作导向的标题，12 字以内
+- 绝不复制原文，必须提炼重组
+- 示例: "六月一号前完成数据标注训练模型" → "数据标注与模型训练"
+- 示例: "今天八点开始学习资料分析" → "资料分析速成学习"
+- 示例: "增加像素画logo设计" → "设计像素画Logo"
 
 progress_delta: 已完成且有数量→提取数字(如"标注10张"→10); 待做→0; 无数字→1
 如果是创建目标/标签，type="objective"，ai_metadata={"title":"目标名","color":"#hex"}

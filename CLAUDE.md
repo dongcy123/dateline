@@ -1,34 +1,50 @@
 # 川上 (River of Time)
 
-Expo + React Native timeline-based personal management app with Supabase backend and DeepSeek AI.
+单页面极简个人管理系统 —— AI-powered bi-directional timeline with Supabase backend and DeepSeek AI.
 
 ## Tech Stack
-- Frontend: Expo (React Native) + `timeline.html` (standalone web preview)
-- Backend: Supabase (PostgreSQL) + Edge Functions
-- AI: DeepSeek API (text), Qwen-VL (vision), local Python proxy for dev
+- Frontend: `timeline.html` (纯 HTML/JS，React 18 + Babel standalone + Tailwind CDN)
+- Server: `server.js` (零依赖 Node.js HTTP server，服务静态页面 + AI 代理)
+- Backend: Supabase (PostgreSQL REST API)
+- AI: DeepSeek API (text), Qwen-VL (vision)，通过 server.js 的 `/api/proxy` 代理调用
+- Deploy: Render (`npm start` → `node server.js`)
 
 ## Quick Start
 ```bash
-# Web preview (fastest iteration)
-open timeline.html
+# 本地开发
+node server.js
+# 浏览器打开 http://localhost:8765
 
-# AI proxy (required for AI features)
+# AI 代理 (file:// 模式下需要)
 python proxy-server.py
 
-# Expo mobile
-npx expo start
+# 或直接打开 HTML
+open timeline.html
 ```
 
 ## Project Structure
 ```
-app/              Expo Router pages
-components/       Shared React Native components
-hooks/            Zustand stores
-services/         AI proxy, Supabase client
-types/            TypeScript type definitions
+timeline.html     主应用 (所有前端逻辑)
+server.js         HTTP server + AI 代理
+proxy-server.py   Python AI 代理 (file:// 开发用)
 supabase/         Migrations, Edge Functions
-static/           Static JS files for web preview
+static/           React/Babel/Supabase SDK 本地备份
 ```
+
+## 环境变量 (.env)
+```
+DEEPSEEK_API_KEY=      DeepSeek 文本 AI
+VISION_API_KEY=        Qwen-VL 视觉 AI (DashScope)
+EXPO_PUBLIC_SUPABASE_URL=    (已内嵌 fallback)
+EXPO_PUBLIC_SUPABASE_ANON_KEY= (已内嵌 fallback)
+```
+
+Server 端通过 `process.env` 读取，`timeline.html` 不直接接触密钥 — 所有 AI 调用走 `/api/proxy`。
+
+## 分支策略
+- `master` — production
+- `frsionos-redesign` — 现行稳定版
+- `feat/*` — 功能分支，完成后合入 stable
 
 ## Testing
 ```bash

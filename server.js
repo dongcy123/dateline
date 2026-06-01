@@ -214,7 +214,14 @@ const server = http.createServer((req, res) => {
         const isExtract = engine === 'extract';
 
         console.log(`[proxy] → ${engine}`);
-        const aiRes = await fetch(targetUrl, { method: 'POST', headers, body: targetBody });
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 25000);
+        let aiRes;
+        try {
+          aiRes = await fetch(targetUrl, { method: 'POST', headers, body: targetBody, signal: controller.signal });
+        } finally {
+          clearTimeout(timeout);
+        }
         const aiText = await aiRes.text();
 
         if (!aiRes.ok) {

@@ -114,7 +114,9 @@ const server = http.createServer((req, res) => {
     req.on('data', chunk => body += chunk);
     req.on('end', async () => {
       try {
-        const { text, image_url, engine } = JSON.parse(body);
+        const parsed = JSON.parse(body);
+        const { text, image_url, engine } = parsed;
+        console.log(`[proxy] raw engine=${engine} text=${(text||'').substring(0,40)} hasHistory=${!!parsed.history} bodyKeys=${Object.keys(parsed).join(',')}`);
         let targetUrl, targetBody, headers;
 
         if (engine === 'vision' && image_url) {

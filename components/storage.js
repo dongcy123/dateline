@@ -100,45 +100,23 @@ window.Kawa.saveEventToSB = async (ev) => {
     ai_metadata: ev.ai_metadata || {}, image_url: ev.image_url || null
   };
   const r = await window.Kawa.sbRest('POST', 'timeline_events', body, { upsert: true });
-  if (r.ok) return true;
-  if (!sb) return false;
-  try {
-    const { error } = await sb.from('timeline_events').upsert(body);
-    if (error) { console.warn('[SB:SDK] save event:', error.message); return false; }
-    return true;
-  } catch (e) { console.warn('[SB:SDK] save event error:', e.message); return false; }
+  if (!r.ok) console.warn('[SB] save event failed:', r.error);
+  return r.ok;
 };
 
 window.Kawa.deleteEventFromSB = async (id) => {
-  const r = await window.Kawa.sbRest('DELETE', 'timeline_events?id=eq.' + encodeURIComponent(id));
-  if (r.ok) return;
-  if (!sb) return;
-  try {
-    const { error } = await sb.from('timeline_events').delete().eq('id', id);
-    if (error) console.warn('[SB:SDK] delete event:', error.message);
-  } catch (e) { console.warn('[SB:SDK] delete event error:', e.message); }
+  await window.Kawa.sbRest('DELETE', 'timeline_events?id=eq.' + encodeURIComponent(id));
 };
 
 window.Kawa.saveObjToSB = async (obj) => {
   const body = { id: obj.id, title: obj.title, target: obj.target, current: obj.current, color: obj.color };
   const r = await window.Kawa.sbRest('POST', 'objectives', body, { upsert: true });
-  if (r.ok) return true;
-  if (!sb) return false;
-  try {
-    const { error } = await sb.from('objectives').upsert(body);
-    if (error) { console.warn('[SB:SDK] save obj:', error.message); return false; }
-    return true;
-  } catch (e) { console.warn('[SB:SDK] save obj error:', e.message); return false; }
+  if (!r.ok) console.warn('[SB] save obj failed:', r.error);
+  return r.ok;
 };
 
 window.Kawa.deleteObjFromSB = async (id) => {
-  const r = await window.Kawa.sbRest('DELETE', 'objectives?id=eq.' + encodeURIComponent(id));
-  if (r.ok) return;
-  if (!sb) return;
-  try {
-    const { error } = await sb.from('objectives').delete().eq('id', id);
-    if (error) console.warn('[SB:SDK] delete obj:', error.message);
-  } catch (e) { console.warn('[SB:SDK] delete obj error:', e.message); }
+  await window.Kawa.sbRest('DELETE', 'objectives?id=eq.' + encodeURIComponent(id));
 };
 
 // 图片上传到 Supabase Storage

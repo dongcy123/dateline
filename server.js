@@ -310,6 +310,7 @@ const server = http.createServer((req, res) => {
         const headers = {
           'apikey': 'sb_publishable_8q1OXyDCIo6wcn82ReOa4w_-3azo0lH',
           'Authorization': 'Bearer sb_publishable_8q1OXyDCIo6wcn82ReOa4w_-3azo0lH',
+          'Prefer': req.headers['prefer'] || 'return=minimal',
         };
 
         const fetchOpts = { method: req.method, headers };

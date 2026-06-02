@@ -356,32 +356,32 @@ const server = http.createServer((req, res) => {
 
   // Debug: test DeepSeek connectivity
   if (url.pathname === '/api/debug') {
-    const results = { deepseek_key: !!DEEPSEEK_KEY, vision_key: !!VISION_KEY, tests: {} };
-
-    // Test DeepSeek
-    if (DEEPSEEK_KEY) {
-      try {
-        const t0 = Date.now();
-        const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + DEEPSEEK_KEY },
-          body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'user', content: 'hi' }], max_tokens: 10 }),
-          signal: AbortSignal.timeout(10000),
-        });
-        const d = await r.json();
-        results.tests.deepseek = {
-          status: r.status,
-          latency_ms: Date.now() - t0,
-          reply: d.choices?.[0]?.message?.content?.substring(0, 50),
-          error: d.error?.message || null,
-        };
-      } catch (e) {
-        results.tests.deepseek = { status: 'fetch_failed', error: e.message };
+    (async () => {
+      const results = { deepseek_key: !!DEEPSEEK_KEY, vision_key: !!VISION_KEY, tests: {} };
+      if (DEEPSEEK_KEY) {
+        try {
+          const t0 = Date.now();
+          const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + DEEPSEEK_KEY },
+            body: JSON.stringify({ model: 'deepseek-chat', messages: [{ role: 'user', content: 'hi' }], max_tokens: 10 }),
+            signal: AbortSignal.timeout(10000),
+          });
+          const d = await r.json();
+          results.tests.deepseek = {
+            status: r.status,
+            latency_ms: Date.now() - t0,
+            reply: d.choices?.[0]?.message?.content?.substring(0, 50),
+            error: d.error?.message || null,
+          };
+        } catch (e) {
+          results.tests.deepseek = { status: 'fetch_failed', error: e.message };
+        }
       }
-    }
-
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify(results));
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(results));
+    })();
+    return;
   }
 
   // Health check

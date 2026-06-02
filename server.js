@@ -326,7 +326,8 @@ const server = http.createServer((req, res) => {
           }
         }
 
-        const upstream = await fetch(sbUrl, fetchOpts);
+        const sbCtrl = new AbortController(); const sbT = setTimeout(() => sbCtrl.abort(), 15000);
+        const upstream = await fetch(sbUrl, { ...fetchOpts, signal: sbCtrl.signal }); clearTimeout(sbT);
 
         // For images, pipe as binary; for JSON, read as text
         const ct = upstream.headers.get('content-type') || '';

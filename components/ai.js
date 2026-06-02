@@ -5,26 +5,23 @@ window.Kawa = window.Kawa || {};
 
 const callAI = async (text, objectives) => {
   const isFileProto = typeof window !== 'undefined' && window.location.protocol === 'file:';
+  const proxyUrl = isFileProto ? 'http://localhost:8765' : '/api/proxy';
 
-  const tryProxy = async (url) => {
-    const r = await fetch(url, {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+  try {
+    const r = await fetch(proxyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, engine: 'text' }),
+      signal: controller.signal,
     });
     if (r.ok) return await r.json();
     const err = await r.json().catch(() => ({}));
     throw new Error(err?.error?.message || 'AI proxy ' + r.status);
-  };
-
-  if (!isFileProto) {
-    try { return await tryProxy('/api/proxy'); } catch (e) {
-      try { return await tryProxy('http://localhost:8765'); } catch {}
-      throw e;
-    }
+  } finally {
+    clearTimeout(timeout);
   }
-
-  return await tryProxy('http://localhost:8765');
 };
 
 window.Kawa.callAI = callAI;

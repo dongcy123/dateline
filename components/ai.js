@@ -4,18 +4,22 @@
 window.Kawa = window.Kawa || {};
 
 const callAI = async (text, objectives) => {
+  console.log('[callAI] invoked with text:', text.substring(0, 40));
   const isFileProto = typeof window !== 'undefined' && window.location.protocol === 'file:';
   const proxyUrl = isFileProto ? 'http://localhost:8765' : '/api/proxy';
+  console.log('[callAI] proxyUrl=', proxyUrl);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
   try {
+    console.log('[callAI] fetching...');
     const r = await fetch(proxyUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, engine: 'text' }),
       signal: controller.signal,
     });
+    console.log('[callAI] response status=', r.status);
     if (r.ok) return await r.json();
     const err = await r.json().catch(() => ({}));
     throw new Error(err?.error?.message || 'AI proxy ' + r.status);

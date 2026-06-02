@@ -64,7 +64,7 @@ const App = () => {
   const future = filtered.filter(e => e.timeline_time > nowIso);
   const past = filtered.filter(e => e.timeline_time <= nowIso);
 
-  const handleSubmit = async text => {
+  const handleSubmit = async text => { console.log('[handleSubmit] called, processing=' + processing + ' text=' + (text||'').substring(0,30));
     if (/^\/目标[：:]\s*(.+)/.test(text) || /^\/obj[：:]\s*(.+)/i.test(text)) {
       const m = text.match(/^(?:\/目标|\/obj)[：:]\s*(.+)/);
       const title = m[1].trim();

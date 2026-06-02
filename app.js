@@ -89,7 +89,7 @@ const App = () => {
       const isKeyNode = aiRes.is_key_node || false;
       const ev = { id: uid(), timeline_time: tl.toISOString(), record_time: new Date().toISOString(), raw_content: text, type: aiRes.type || 'note', status: 'pending', objective_id: oid || undefined, is_key_node: isKeyNode, ai_metadata: aiRes.ai_metadata || {} };
       setEvents(prev => [ev, ...prev]);
-      const sbOk = await saveEventToSB(ev);
+      setProcessing(false);
       if (oid && isKeyNode && (aiRes.ai_metadata?.progress_delta || 0) > 0) {
         setObjectives(prev => {
           const updated = prev.map(o => o.id === oid ? { ...o, current: o.current + (aiRes.ai_metadata.progress_delta || 0) } : o);
@@ -99,12 +99,8 @@ const App = () => {
         });
       }
       const on = objectives.find(o => o.id === oid);
-      const locOk = storageAvailable();
-      const tags = [];
-      if (!locOk) tags.push('本地存储不可用');
-      if (!sbOk) tags.push('未同步到云端');
-      const suffix = tags.length > 0 ? ' (' + tags.join('，') + ')' : '';
-      toast_(TYPE_LABELS[ev.type] + ' · ' + fmtDate(tl) + ' ' + fmtTime(tl) + (on ? ' → ' + on.title : '') + suffix);
+      toast_(TYPE_LABELS[ev.type] + ' · ' + fmtDate(tl) + ' ' + fmtTime(tl) + (on ? ' → ' + on.title : ''));
+      saveEventToSB(ev).then(ok => { if (!ok) toast_('⚠ 未同步到云端'); });
     } catch (e) { toast_('⚠ ' + (e.message || '出错')); }
     finally { setProcessing(false); setTimeout(() => nowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100); }
   };

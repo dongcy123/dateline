@@ -76,7 +76,7 @@ const App = () => {
 
     setProcessing(true);
     try {
-      let aiRes; try { aiRes = await callAI(text, objectives); } catch (e) { aiRes = localParse(text); }
+      let aiRes; let aiFailed = false; try { aiRes = await callAI(text, objectives); } catch (e) { aiRes = localParse(text); aiFailed = true; }
       if (aiRes.type === 'objective') {
         const aiObj = { id: uid(), title: aiRes.ai_metadata.title, target: 100, current: 0, color: aiRes.ai_metadata.color || OBJ_PALETTE[Math.floor(Math.random() * OBJ_PALETTE.length)] };
         setObjectives(prev => [...prev, aiObj]);
@@ -99,7 +99,7 @@ const App = () => {
         });
       }
       const on = objectives.find(o => o.id === oid);
-      toast_(TYPE_LABELS[ev.type] + ' · ' + fmtDate(tl) + ' ' + fmtTime(tl) + (on ? ' → ' + on.title : ''));
+      toast_(TYPE_LABELS[ev.type] + ' · ' + fmtDate(tl) + ' ' + fmtTime(tl) + (on ? ' → ' + on.title : '') + (aiFailed ? ' [本地解析]' : ''));
       saveEventToSB(ev).then(ok => { if (!ok) toast_('⚠ 未同步到云端'); });
     } catch (e) { toast_('⚠ ' + (e.message || '出错')); }
     finally { setProcessing(false); setTimeout(() => nowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100); }

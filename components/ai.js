@@ -10,7 +10,7 @@ const callAI = async (text, objectives) => {
   console.log('[callAI] proxyUrl=', proxyUrl);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
+  const timeout = setTimeout(() => { console.warn('[callAI] timeout after 12s, aborting'); controller.abort(); }, 12000);
   try {
     console.log('[callAI] fetching...');
     const r = await fetch(proxyUrl, {

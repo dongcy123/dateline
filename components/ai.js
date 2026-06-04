@@ -4,27 +4,37 @@
 window.Kawa = window.Kawa || {};
 
 const callAI = async (text, objectives) => {
-  console.log('[callAI] invoked with text:', text.substring(0, 40));
   const isFileProto = typeof window !== 'undefined' && window.location.protocol === 'file:';
   const proxyUrl = isFileProto ? 'http://localhost:8765' : '/api/proxy';
-  console.log('[callAI] proxyUrl=', proxyUrl);
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => { console.warn('[callAI] timeout after 12s, aborting'); controller.abort(); }, 12000);
+  const doFetch = async (attempt) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => { console.warn('[callAI] attempt ' + attempt + ' timeout after 12s'); controller.abort(); }, 12000);
+    try {
+      const r = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, engine: 'text' }),
+        signal: controller.signal,
+        cache: 'no-store',
+      });
+      if (r.ok) return await r.json();
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err?.error?.message || 'AI proxy ' + r.status);
+    } finally {
+      clearTimeout(timeout);
+    }
+  };
+
   try {
-    console.log('[callAI] fetching...');
-    const r = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, engine: 'text' }),
-      signal: controller.signal,
-    });
-    console.log('[callAI] response status=', r.status);
-    if (r.ok) return await r.json();
-    const err = await r.json().catch(() => ({}));
-    throw new Error(err?.error?.message || 'AI proxy ' + r.status);
-  } finally {
-    clearTimeout(timeout);
+    return await doFetch(1);
+  } catch (e) {
+    console.warn('[callAI] attempt 1 failed:', e.message);
+    // Retry once on network failure — often succeeds on fresh connection
+    try { return await doFetch(2); } catch (e2) {
+      console.warn('[callAI] attempt 2 also failed:', e2.message);
+      throw e2;
+    }
   }
 };
 

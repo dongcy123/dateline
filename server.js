@@ -4,6 +4,7 @@ const path = require('path');
 
 const PORT = process.env.PORT || 8765;
 const HTML_FILE = path.join(__dirname, 'index.html');
+const V1_FILE = path.join(__dirname, 'v1.html');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -414,8 +415,11 @@ const server = http.createServer((req, res) => {
     return res.end(JSON.stringify({ status: 'ok', version: '2.0.0' }));
   }
 
-  // Serve timeline.html for root
-  if (url.pathname === '/' || url.pathname === '/index.html') {
+  // Serve v1.0 for root, old timeline at /index.html
+  if (url.pathname === '/') {
+    return serveFile(res, V1_FILE);
+  }
+  if (url.pathname === '/index.html' || url.pathname === '/timeline') {
     return serveFile(res, HTML_FILE);
   }
 

@@ -19,6 +19,8 @@ const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY;
 const VISION_KEY = process.env.VISION_API_KEY;
 const VISION_MODEL = process.env.VISION_MODEL || 'qwen-vl-max';
 const VISION_BASE_URL = process.env.VISION_BASE_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1';
+const SB_KEY = 'sb_publishable_8q1OXyDCIo6wcn82ReOa4w_-3azo0lH';
+const SB_URL = 'https://gduqrtzoggpjyifxvzxy.supabase.co';
 
 const SYSTEM_PROMPT = `你是《川上》个人战略执行系统的 AI 助手。分析用户输入，返回严格 JSON。
 
@@ -304,13 +306,13 @@ const server = http.createServer((req, res) => {
   // Supabase REST proxy — 浏览器在国内无法直连 Supabase
   if (url.pathname.startsWith('/api/sb/')) {
     const sbPath = url.pathname.replace('/api/sb', '') + url.search;
-    const sbUrl = 'https://gduqrtzoggpjyifxvzxy.supabase.co' + sbPath;
+    const sbUrl = SB_URL + sbPath;
 
     const proxyReq = async () => {
       try {
         const headers = {
-          'apikey': 'sb_publishable_8q1OXyDCIo6wcn82ReOa4w_-3azo0lH',
-          'Authorization': 'Bearer sb_publishable_8q1OXyDCIo6wcn82ReOa4w_-3azo0lH',
+          'apikey': SB_KEY,
+          'Authorization': 'Bearer ' + SB_KEY,
           'Prefer': req.headers['prefer'] || 'return=minimal',
         };
 
@@ -385,6 +387,23 @@ const server = http.createServer((req, res) => {
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(results));
+    })();
+    return;
+  }
+
+  // Keepalive — prevents Render cold-start + Supabase pause. Ping via Render Cron Job every 10 min.
+  if (url.pathname === '/api/keepalive') {
+    (async () => {
+      let sbOk = false;
+      try {
+        const r = await fetch(SB_URL + '/rest/v1/timeline_events?limit=1', {
+          headers: { apikey: SB_KEY, Authorization: 'Bearer ' + SB_KEY },
+          signal: AbortSignal.timeout(10000),
+        });
+        sbOk = r.ok;
+      } catch {}
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ ok: true, sb: sbOk ? 'up' : 'down', ts: new Date().toISOString() }));
     })();
     return;
   }

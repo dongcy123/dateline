@@ -92,6 +92,68 @@ window.Kawa.loadFromSB = async () => {
   }
 };
 
+// ==========================================
+// 离线同步队列 — 失败自动重试，指数退避
+// ==========================================
+const SYNC_QUEUE_KEY = '__kw_sync_queue__';
+let _sq = [];
+let _sqBusy = false;
+
+// 从 localStorage 恢复上次未完成的队列
+try {
+  const saved = localStorage.getItem(SYNC_QUEUE_KEY);
+  if (saved) { _sq = JSON.parse(saved); console.log('[Sync] loaded ' + _sq.length + ' pending items'); }
+} catch {}
+
+const _sqPersist = () => {
+  try { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(_sq)); } catch {}
+};
+
+const _sqProcess = async () => {
+  if (_sqBusy || _sq.length === 0) return;
+  _sqBusy = true;
+  while (_sq.length > 0) {
+    const item = _sq[0];
+    try {
+      const r = await window.Kawa.sbRest(item.method, item.table, item.body, item.opts);
+      if (r.ok) {
+        _sq.shift(); _sqPersist();
+        console.log('[Sync] ✓ ' + item.table + ' synced (' + _sq.length + ' remaining)');
+        continue;
+      }
+    } catch {}
+    item.retries = (item.retries || 0) + 1;
+    if (item.retries > 5) {
+      console.warn('[Sync] ✗ giving up on ' + item.table + ' after 5 retries');
+      _sq.shift(); _sqPersist();
+      continue;
+    }
+    const delay = Math.min(1000 * Math.pow(2, item.retries - 1), 30000);
+    console.log('[Sync] retry #' + item.retries + ' for ' + item.table + ' in ' + (delay / 1000) + 's');
+    await new Promise(r => setTimeout(r, delay));
+  }
+  _sqBusy = false;
+};
+
+// 带自动重试的保存 — 失败静默入队
+window.Kawa.sbRestSafe = async (method, table, body, opts = {}) => {
+  const r = await window.Kawa.sbRest(method, table, body, opts);
+  if (!r.ok) {
+    _sq.push({ method, table, body, opts, ts: Date.now(), retries: 0 });
+    _sqPersist();
+    _sqProcess();
+  }
+  return r;
+};
+
+window.Kawa.syncRemaining = () => _sq.length;
+
+// 页面启动时自动重试上次未完成的同步
+if (_sq.length > 0) {
+  console.log('[Sync] resuming ' + _sq.length + ' pending items...');
+  _sqProcess();
+}
+
 window.Kawa.saveEventToSB = async (ev) => {
   const body = {
     id: ev.id, timeline_time: ev.timeline_time, record_time: ev.record_time,
@@ -99,8 +161,8 @@ window.Kawa.saveEventToSB = async (ev) => {
     objective_id: ev.objective_id || null, is_key_node: ev.is_key_node || false,
     ai_metadata: ev.ai_metadata || {}, image_url: ev.image_url || null
   };
-  const r = await window.Kawa.sbRest('POST', 'timeline_events', body, { upsert: true });
-  if (!r.ok) console.warn('[SB] save event failed:', r.error);
+  const r = await window.Kawa.sbRestSafe('POST', 'timeline_events', body, { upsert: true });
+  if (!r.ok) console.warn('[SB] save event failed (queued):', r.error);
   return r.ok;
 };
 
@@ -110,8 +172,8 @@ window.Kawa.deleteEventFromSB = async (id) => {
 
 window.Kawa.saveObjToSB = async (obj) => {
   const body = { id: obj.id, title: obj.title, target: obj.target, current: obj.current, color: obj.color };
-  const r = await window.Kawa.sbRest('POST', 'objectives', body, { upsert: true });
-  if (!r.ok) console.warn('[SB] save obj failed:', r.error);
+  const r = await window.Kawa.sbRestSafe('POST', 'objectives', body, { upsert: true });
+  if (!r.ok) console.warn('[SB] save obj failed (queued):', r.error);
   return r.ok;
 };
 

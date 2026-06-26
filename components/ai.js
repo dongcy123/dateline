@@ -7,35 +7,46 @@ const callAI = async (text, objectives) => {
   const isFileProto = typeof window !== 'undefined' && window.location.protocol === 'file:';
   const proxyUrl = isFileProto ? 'http://localhost:8765' : '/api/proxy';
 
-  const doFetch = async (attempt) => {
+  // Single fetch with 18s timeout (up from 12s to survive Render cold starts)
+  const doFetch = () => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => { console.warn('[callAI] attempt ' + attempt + ' timeout after 12s'); controller.abort(); }, 12000);
-    try {
-      const r = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, engine: 'text' }),
-        signal: controller.signal,
-        cache: 'no-store',
-      });
+    const timeout = setTimeout(() => { console.warn('[callAI] timeout after 18s'); controller.abort(); }, 18000);
+    const p = fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, engine: 'text' }),
+      signal: controller.signal,
+      cache: 'no-store',
+    }).then(async r => {
+      clearTimeout(timeout);
       if (r.ok) return await r.json();
       const err = await r.json().catch(() => ({}));
       throw new Error(err?.error?.message || 'AI proxy ' + r.status);
-    } finally {
+    }).catch(e => {
       clearTimeout(timeout);
-    }
+      throw e;
+    });
+    return p;
   };
 
-  try {
-    return await doFetch(1);
-  } catch (e) {
-    console.warn('[callAI] attempt 1 failed:', e.message);
-    // Retry once on network failure — often succeeds on fresh connection
-    try { return await doFetch(2); } catch (e2) {
-      console.warn('[callAI] attempt 2 also failed:', e2.message);
-      throw e2;
-    }
+  // Race: AI response vs 3s fallback timer
+  const aiPromise = doFetch();
+  const winner = await Promise.race([
+    aiPromise.then(r => ({ source: 'ai', data: r })),
+    new Promise(resolve => setTimeout(() => resolve({ source: 'fallback', data: null }), 3000))
+  ]);
+
+  if (winner.source === 'fallback') {
+    console.log('[callAI] 3s fallback → localParse, AI still pending');
+    // Return localParse immediately; aiPromise resolves later with real AI data (or null)
+    return {
+      result: window.Kawa.localParse(text),
+      aiPending: aiPromise.catch(e => { console.warn('[callAI] late AI also failed:', e.message); return null; })
+    };
   }
+
+  console.log('[callAI] AI responded in <3s');
+  return { result: winner.data, aiPending: null };
 };
 
 window.Kawa.callAI = callAI;

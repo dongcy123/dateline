@@ -76,7 +76,10 @@ const App = () => {
 
     setProcessing(true);
     try {
-      let aiRes; let aiFailed = false; try { aiRes = await callAI(text, objectives); } catch (e) { aiRes = localParse(text); aiFailed = true; }
+      // New callAI: always returns { result, aiPending } — result is immediate (AI or fallback)
+      const { result: aiRes, aiPending } = await callAI(text, objectives);
+      const aiFallback = !!aiPending; // true if localParse was used, AI still coming
+
       if (aiRes.type === 'objective') {
         const aiObj = { id: uid(), title: aiRes.ai_metadata.title, target: 100, current: 0, color: aiRes.ai_metadata.color || OBJ_PALETTE[Math.floor(Math.random() * OBJ_PALETTE.length)] };
         setObjectives(prev => [...prev, aiObj]);
@@ -87,7 +90,8 @@ const App = () => {
       if (!tl || isNaN(tl.getTime())) tl = parseTime(text);
       const oid = aiRes.objective_id || matchObj(text, objectives);
       const isKeyNode = aiRes.is_key_node || false;
-      const ev = { id: uid(), timeline_time: tl.toISOString(), record_time: new Date().toISOString(), raw_content: text, type: aiRes.type || 'note', status: 'pending', objective_id: oid || undefined, is_key_node: isKeyNode, ai_metadata: aiRes.ai_metadata || {} };
+      const evId = uid();
+      const ev = { id: evId, timeline_time: tl.toISOString(), record_time: new Date().toISOString(), raw_content: text, type: aiRes.type || 'note', status: 'pending', objective_id: oid || undefined, is_key_node: isKeyNode, ai_metadata: aiRes.ai_metadata || {} };
       setEvents(prev => [ev, ...prev]);
       setProcessing(false);
       if (oid && isKeyNode && (aiRes.ai_metadata?.progress_delta || 0) > 0) {
@@ -99,8 +103,34 @@ const App = () => {
         });
       }
       const on = objectives.find(o => o.id === oid);
-      toast_(TYPE_LABELS[ev.type] + ' · ' + fmtDate(tl) + ' ' + fmtTime(tl) + (on ? ' → ' + on.title : '') + (aiFailed ? ' [本地解析]' : ''));
-      saveEventToSB(ev).then(ok => { if (!ok) toast_('⚠ 未同步到云端'); });
+      toast_(TYPE_LABELS[ev.type] + ' · ' + fmtDate(tl) + ' ' + fmtTime(tl) + (on ? ' → ' + on.title : '') + (aiFallback ? ' [本地解析]' : ''));
+      saveEventToSB(ev);
+
+      // If AI is still pending (we used localParse fallback), update the card when it arrives
+      if (aiPending) {
+        aiPending.then(lateAi => {
+          if (!lateAi || lateAi.type === 'objective') return;
+          setEvents(prev => prev.map(e => {
+            if (e.id !== evId) return e;
+            const lateTl = lateAi.timeline_time ? new Date(lateAi.timeline_time) : tl;
+            const lateOid = lateAi.objective_id || matchObj(text, objectives);
+            return {
+              ...e,
+              type: lateAi.type || e.type,
+              ai_metadata: { ...e.ai_metadata, ...(lateAi.ai_metadata || {}) },
+              timeline_time: (lateTl && !isNaN(lateTl.getTime())) ? lateTl.toISOString() : e.timeline_time,
+              objective_id: lateOid || e.objective_id,
+              is_key_node: lateAi.is_key_node || e.is_key_node,
+            };
+          }));
+          // Re-save updated event to SB
+          setEvents(prev => {
+            const updated = prev.find(e => e.id === evId);
+            if (updated) saveEventToSB(updated);
+            return prev;
+          });
+        });
+      }
     } catch (e) { toast_('⚠ ' + (e.message || '出错')); }
     finally { setProcessing(false); setTimeout(() => nowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100); }
   };

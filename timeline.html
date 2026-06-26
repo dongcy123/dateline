@@ -15,9 +15,9 @@
     <script>tailwind.config={theme:{extend:{fontFamily:{sans:['Inter','Noto Sans SC','PingFang SC','sans-serif']},colors:{beige:{50:'#FCF9F6',100:'#F5F0EB',200:'#EDE7E0',300:'#E8E0D8'},lavender:{100:'#E8E4F4',200:'#D4CEE8',300:'#B8B5E0',400:'#A89FCD',500:'#8B7FB8',600:'#6B5E9A'}},animation:{'fade-in':'fadeIn 0.3s ease-out','slide-down':'slideDown 0.3s ease-out','shimmer':'shimmer 2s ease-in-out infinite','pulse-glow':'pulseGlow 2s ease-in-out infinite','float':'float 6s ease-in-out infinite'},keyframes:{fadeIn:{'0%':{opacity:'0'},'100%':{opacity:'1'}},slideDown:{'0%':{opacity:'0',transform:'translateY(-6px)'},'100%':{opacity:'1',transform:'translateY(0)'}},shimmer:{'0%,100%':{opacity:'0.4'},'50%':{opacity:'0.8'}},pulseGlow:{'0%,100%':{boxShadow:'0 0 0 0 rgba(184,181,224,0.4)'},'50%':{boxShadow:'0 0 0 8px rgba(184,181,224,0)'}},float:{'0%,100%':{transform:'translateY(0px)'},'50%':{transform:'translateY(-8px)'}}}}}}</script>
     <style>
         :root {
-            --bg-primary: #F5F0EB;
-            --bg-secondary: #EDE7E0;
-            --bg-tertiary: #E8E0D8;
+            --bg-primary: #F5F5F5;
+            --bg-secondary: #EEEEEE;
+            --bg-tertiary: #E5E5E5;
             --accent-100: #E8E4F4;
             --accent-200: #D4CEE8;
             --accent-300: #B8B5E0;
@@ -33,7 +33,7 @@
             --text-primary: #2D2838;
             --text-secondary: #5C5670;
             --text-tertiary: #8B84A0;
-            --text-inverse: #F5F0EB;
+            --text-inverse: #F5F5F5;
             --shadow-card: none;
             --shadow-card-hover: none;
             --shadow-header: none;
@@ -151,6 +151,61 @@ const sbRest = async (method, table, body, opts = {}) => {
     }
 };
 
+// ==========================================
+// 离线同步队列 — 失败自动重试，指数退避
+// ==========================================
+const SYNC_QUEUE_KEY = '__kw_sync_queue__';
+let _syncQueue = [];
+let _syncBusy = false;
+
+try {
+  const saved = localStorage.getItem(SYNC_QUEUE_KEY);
+  if (saved) { _syncQueue = JSON.parse(saved); console.log('[Sync] loaded ' + _syncQueue.length + ' pending items'); }
+} catch {}
+
+const _persistQueue = () => {
+  try { localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(_syncQueue)); } catch {}
+};
+
+const _processQueue = async () => {
+  if (_syncBusy || _syncQueue.length === 0) return;
+  _syncBusy = true;
+  while (_syncQueue.length > 0) {
+    const item = _syncQueue[0];
+    try {
+      const r = await sbRest(item.method, item.table, item.body, item.opts);
+      if (r.ok) {
+        _syncQueue.shift(); _persistQueue();
+        console.log('[Sync] ✓ ' + item.table + ' synced (' + _syncQueue.length + ' remaining)');
+        continue;
+      }
+    } catch {}
+    item.retries = (item.retries || 0) + 1;
+    if (item.retries > 5) {
+      console.warn('[Sync] ✗ giving up on ' + item.table + ' after 5 retries');
+      _syncQueue.shift(); _persistQueue();
+      continue;
+    }
+    const delay = Math.min(1000 * Math.pow(2, item.retries - 1), 30000);
+    await new Promise(r => setTimeout(r, delay));
+  }
+  _syncBusy = false;
+};
+
+// 带自动重试的保存 — 失败静默入队
+const sbRestSafe = async (method, table, body, opts = {}) => {
+  const r = await sbRest(method, table, body, opts);
+  if (!r.ok) {
+    _syncQueue.push({ method, table, body, opts, ts: Date.now(), retries: 0 });
+    _persistQueue();
+    _processQueue();
+  }
+  return r;
+};
+
+// 页面启动时自动重试未完成的同步
+if (_syncQueue.length > 0) _processQueue();
+
 // 从 Supabase 加载数据 (优先 SDK, 回退 REST)
 const loadFromSB = async () => {
     // 先用 REST 加载 (更可靠)
@@ -187,9 +242,9 @@ const saveEventToSB = async (ev) => {
         objective_id: ev.objective_id || null, is_key_node: ev.is_key_node || false,
         ai_metadata: ev.ai_metadata || {}
     };
-    const r = await sbRest('POST', 'timeline_events', body, { upsert: true });
+    const r = await sbRestSafe('POST', 'timeline_events', body, { upsert: true });
     if (r.ok) { console.log('[SB:REST] event saved'); return true; }
-    console.warn('[SB:REST] save event failed:', r.error);
+    console.warn('[SB:REST] save event failed (queued):', r.error);
     // 回退 SDK
     if (!sb) return false;
     try {
@@ -214,9 +269,9 @@ const deleteEventFromSB = async (id) => {
 // 写入目标到 Supabase
 const saveObjToSB = async (obj) => {
     const body = { id: obj.id, title: obj.title, target: obj.target, current: obj.current, color: obj.color };
-    const r = await sbRest('POST', 'objectives', body, { upsert: true });
+    const r = await sbRestSafe('POST', 'objectives', body, { upsert: true });
     if (r.ok) { console.log('[SB:REST] obj saved'); return true; }
-    console.warn('[SB:REST] save obj failed:', r.error);
+    console.warn('[SB:REST] save obj failed (queued):', r.error);
     if (!sb) return false;
     try {
         const { error } = await sb.from('objectives').upsert(body);
@@ -246,28 +301,46 @@ const MOCK_EVENTS = [];
 // AI 代理 — 同源 /api/proxy（server.js / Render），本地 fallback localhost:8765
 const callAI = async (text, objectives) => {
     const isFileProto = typeof window !== 'undefined' && window.location.protocol === 'file:';
+    const proxyUrl = isFileProto ? 'http://localhost:8765' : '/api/proxy';
 
-    const tryProxy = async (url) => {
-        const r = await fetch(url, {
+    const doFetch = () => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => { console.warn('[callAI] timeout after 18s'); controller.abort(); }, 18000);
+        const p = fetch(proxyUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text, engine: 'text' }),
+            signal: controller.signal,
+            cache: 'no-store',
+        }).then(async r => {
+            clearTimeout(timeout);
+            if (r.ok) return await r.json();
+            const err = await r.json().catch(() => ({}));
+            throw new Error(err?.error?.message || 'AI proxy ' + r.status);
+        }).catch(e => {
+            clearTimeout(timeout);
+            throw e;
         });
-        if (r.ok) return await r.json();
-        const err = await r.json().catch(() => ({}));
-        throw new Error(err?.error?.message || 'AI proxy ' + r.status);
+        return p;
     };
 
-    // 非 file:// → 优先同源代理
-    if (!isFileProto) {
-        try { return await tryProxy('/api/proxy'); } catch (e) {
-            try { return await tryProxy('http://localhost:8765'); } catch {}
-            throw e;
-        }
+    // Race: AI response vs 3s fallback timer
+    const aiPromise = doFetch();
+    const winner = await Promise.race([
+        aiPromise.then(r => ({ source: 'ai', data: r })),
+        new Promise(resolve => setTimeout(() => resolve({ source: 'fallback', data: null }), 3000))
+    ]);
+
+    if (winner.source === 'fallback') {
+        console.log('[callAI] 3s fallback → localParse, AI still pending');
+        return {
+            result: localParse(text),
+            aiPending: aiPromise.catch(e => { console.warn('[callAI] late AI also failed:', e.message); return null; })
+        };
     }
 
-    // file:// → 本地 Python 代理
-    return await tryProxy('http://localhost:8765');
+    console.log('[callAI] AI responded in <3s');
+    return { result: winner.data, aiPending: null };
 };
 
 // 中文时间解析 (AI 失败兜底)
@@ -701,7 +774,7 @@ const Omnibox = ({ onSubmitText, isProcessing }) => {
     const submit=e=>{e.preventDefault();if(text.trim()&&!isProcessing){onSubmitText(text.trim());setText('');}};
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 p-4 pb-8 z-50" style={{background:'linear-gradient(to top,rgba(245,240,235,1) 0%,rgba(245,240,235,0.95) 60%,transparent 100%)'}}>
+        <div className="fixed bottom-0 left-0 right-0 p-4 pb-8 z-50" style={{background:'linear-gradient(to top,rgba(245,245,245,1) 0%,rgba(245,245,245,0.95) 60%,transparent 100%)'}}>
             <form onSubmit={submit} className={`flex items-center gap-2 max-w-lg mx-auto h-11 px-4 glass-light transition-all duration-300 rounded-xl ${isProcessing?'animate-pulse-glow':''}`}>
                 <input type="text" value={text} onChange={e=>setText(e.target.value)} placeholder={isProcessing?'AI 处理中...':listening?'聆听中...':'输入记录 或 "/目标 名称" 创建目标'} disabled={isProcessing} className="flex-1 bg-transparent border-none outline-none text-sm font-light disabled:opacity-30" style={{color:'var(--text-primary)'}}/>
                 {text.trim()?<button type="submit" disabled={isProcessing} style={{color:'var(--text-tertiary)'}}><Ic.Send/></button>
@@ -793,7 +866,10 @@ const App = () => {
 
         setProcessing(true);
         try {
-            let aiRes; try{aiRes=await callAI(text,objectives);}catch(e){aiRes=localParse(text);}
+            // New callAI: always returns { result, aiPending }
+            const { result: aiRes, aiPending } = await callAI(text, objectives);
+            const aiFallback = !!aiPending;
+
             if(aiRes.type==='objective'){
                 const aiObj = {id:uid(),title:aiRes.ai_metadata.title,target:100,current:0,color:aiRes.ai_metadata.color||OBJ_PALETTE[Math.floor(Math.random()*OBJ_PALETTE.length)]};
                 setObjectives(prev=>[...prev,aiObj]);
@@ -804,7 +880,8 @@ const App = () => {
             if(!tl||isNaN(tl.getTime())) tl=parseTime(text);
             const oid=aiRes.objective_id||matchObj(text,objectives);
             const isKeyNode = aiRes.is_key_node || false;
-            const ev={id:uid(),timeline_time:tl.toISOString(),record_time:new Date().toISOString(),raw_content:text,type:aiRes.type||'note',status:'pending',objective_id:oid||undefined,is_key_node:isKeyNode,ai_metadata:aiRes.ai_metadata||{}};
+            const evId = uid();
+            const ev={id:evId,timeline_time:tl.toISOString(),record_time:new Date().toISOString(),raw_content:text,type:aiRes.type||'note',status:'pending',objective_id:oid||undefined,is_key_node:isKeyNode,ai_metadata:aiRes.ai_metadata||{}};
             setEvents(prev=>[ev,...prev]);
             const sbOk = await saveEventToSB(ev);
             if(oid&&isKeyNode&&(aiRes.ai_metadata?.progress_delta||0)>0){
@@ -820,8 +897,35 @@ const App = () => {
             const tags = [];
             if (!locOk) tags.push('本地存储不可用');
             if (!sbOk) tags.push('未同步到云端');
+            if (aiFallback) tags.push('本地解析');
             const suffix = tags.length > 0 ? ' (' + tags.join('，') + ')' : '';
             toast_(`${TYPE_LABELS[ev.type]} · ${fmtDate(tl)} ${fmtTime(tl)}${on?' → '+on.title:''}${suffix}`);
+
+            // If AI is still pending, update the card when it arrives
+            if (aiPending) {
+                aiPending.then(lateAi => {
+                    if (!lateAi || lateAi.type === 'objective') return;
+                    setEvents(prev => prev.map(e => {
+                        if (e.id !== evId) return e;
+                        const lateTl = lateAi.timeline_time ? new Date(lateAi.timeline_time) : tl;
+                        const lateOid = lateAi.objective_id || matchObj(text, objectives);
+                        return {
+                            ...e,
+                            type: lateAi.type || e.type,
+                            ai_metadata: { ...e.ai_metadata, ...(lateAi.ai_metadata || {}) },
+                            timeline_time: (lateTl && !isNaN(lateTl.getTime())) ? lateTl.toISOString() : e.timeline_time,
+                            objective_id: lateOid || e.objective_id,
+                            is_key_node: lateAi.is_key_node || e.is_key_node,
+                        };
+                    }));
+                    // Re-save updated event
+                    setEvents(prev => {
+                        const updated = prev.find(e => e.id === evId);
+                        if (updated) saveEventToSB(updated);
+                        return prev;
+                    });
+                });
+            }
         }catch(e){toast_('⚠ '+(e.message||'出错'));}
         finally{setProcessing(false);setTimeout(()=>nowRef.current?.scrollIntoView({behavior:'smooth',block:'center'}),100);}
     };

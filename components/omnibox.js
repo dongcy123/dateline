@@ -49,7 +49,7 @@ window.Kawa.Omnibox = ({ onSubmitText, isProcessing, onChatOpen, onImageSubmit }
   const placeholder = imgUploading ? '上传图片中...' : isProcessing ? 'AI 处理中...' : listening ? '聆听中...' : '输入记录 或 "/目标 名称" 创建目标';
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 p-4 pb-8 z-50" style={{ background: 'linear-gradient(to top,rgba(245,240,235,1) 0%,rgba(245,240,235,0.95) 60%,transparent 100%)' }}>
+    <div className="fixed bottom-0 left-0 right-0 p-4 pb-8 z-50" style={{ background: 'linear-gradient(to top,rgba(245,245,245,1) 0%,rgba(245,245,245,0.95) 60%,transparent 100%)' }}>
       {/* Hidden file picker */}
       <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImagePick} />
 

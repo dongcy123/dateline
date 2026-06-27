@@ -4,7 +4,7 @@
 // 模块二：沉淀瀑布流（双列 Masonry）
 // ==========================================
 const { useState, useEffect, useRef, useMemo } = React;
-const { Top3Focus, Omnibox, CardDetail, MasonryCard, CalendarHeatmap, PostEditor, callAI, parseTime, localParse, matchObj, load, save, storageAvailable, loadFromSB, saveEventToSB, deleteEventFromSB, saveObjToSB, deleteObjFromSB, uid, fmtTime, fmtDate, tsDay, todayStr, OBJ_PALETTE, TYPE_LABELS, EV_KEY, OBJ_KEY, MOCK_OBJS, MOCK_EVENTS, Ic } = window.Kawa;
+const { Top3Focus, Omnibox, CardDetail, MasonryCard, PostEditor, callAI, parseTime, localParse, matchObj, load, save, storageAvailable, loadFromSB, saveEventToSB, deleteEventFromSB, saveObjToSB, deleteObjFromSB, uid, fmtTime, fmtDate, tsDay, todayStr, OBJ_PALETTE, TYPE_LABELS, EV_KEY, OBJ_KEY, MOCK_OBJS, MOCK_EVENTS, Ic } = window.Kawa;
 
 const App = () => {
   // ── 数据层（与现有 app.js 完全相同）──
@@ -20,7 +20,6 @@ const App = () => {
   const [toast, setToast] = useState(null);
   const [storageWarn, setStorageWarn] = useState(false);
   const [activeTag, setActiveTag] = useState(null);   // Tag 筛选
-  const [selectedDate, setSelectedDate] = useState(null); // 热力图日期筛选
   const [selectedCard, setSelectedCard] = useState(null);  // 详情浮层
   const [editorOpen, setEditorOpen] = useState(false);     // 发布编辑器
   const [editorImages, setEditorImages] = useState(null); // 编辑器初始图片
@@ -83,7 +82,6 @@ const App = () => {
       });
     let filtered = cards;
     if (activeTag) filtered = filtered.filter(e => e.objective_id === activeTag);
-    if (selectedDate) filtered = filtered.filter(e => tsDay(new Date(e.record_time)) === selectedDate);
     return filtered;
   }, [events, activeTag]);
 
@@ -331,9 +329,6 @@ const App = () => {
             </span>
           </div>
         </div>
-
-        {/* 日历热力图 */}
-        <CalendarHeatmap events={events} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
 
         {/* ══ 模块一：Top 3 待办 ══ */}
         <div className="mb-6">

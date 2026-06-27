@@ -80,11 +80,26 @@ window.Kawa.CardDetail = ({ card, objectives, onClose, onSave, onDelete }) => {
       // ── 滚动内容 ──
       React.createElement('div', { key: 'scroll', className: 'overflow-y-auto no-scrollbar', style: { flex: 1 } },
 
-        // ─── 图片（全宽，不收高度限制）───
-        card.image_url && React.createElement('img', {
-          key: 'img', src: card.image_url, alt: title,
-          style: { width: '100%', display: 'block', objectFit: 'contain', maxHeight: '50vh' }
-        }),
+        // ─── 多图展示 ───
+        (() => {
+          const allImgs = card.ai_metadata?.images || (card.image_url ? [card.image_url] : []);
+          if (allImgs.length === 0) return null;
+          if (allImgs.length === 1) {
+            return React.createElement('img', { key: 'img', src: allImgs[0], alt: title,
+              style: { width: '100%', display: 'block', objectFit: 'contain', maxHeight: '50vh' }
+            });
+          }
+          // 多图：水平滚动
+          return React.createElement('div', { key: 'imgs', className: 'overflow-x-auto no-scrollbar',
+            style: { display: 'flex', gap: 4, padding: '0 4px' }
+          },
+            allImgs.map((url, i) =>
+              React.createElement('img', { key: i, src: url, alt: title + ' ' + (i+1),
+                style: { height: '40vh', width: 'auto', flexShrink: 0, borderRadius: 4, objectFit: 'cover' }
+              })
+            )
+          );
+        })(),
 
         // ─── 内容区 ───
         React.createElement('div', { key: 'content', style: { padding: '20px 20px 16px' } },

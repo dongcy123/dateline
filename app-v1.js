@@ -23,6 +23,9 @@ const App = () => {
   const [selectedDate, setSelectedDate] = useState(null); // 热力图日期筛选
   const [selectedCard, setSelectedCard] = useState(null);  // 详情浮层
   const [editorOpen, setEditorOpen] = useState(false);     // 发布编辑器
+  const [editorImages, setEditorImages] = useState(null); // 编辑器初始图片
+  const fabFileRef = useRef(null);
+  const fabTimeoutRef = useRef(null);
 
   // 瀑布流布局状态
   const [masonryColumns, setMasonryColumns] = useState(2);
@@ -264,20 +267,43 @@ const App = () => {
         <PostEditor
           objectives={objectives}
           onPublish={handlePublish}
-          onClose={() => setEditorOpen(false)}
+          onClose={() => { setEditorOpen(false); setEditorImages(null); }}
+          initialImages={editorImages}
         />
       )}
 
+      {/* 隐藏文件选择器（FAB 触发） */}
+      <input ref={fabFileRef} type="file" accept="image/*" multiple
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          clearTimeout(fabTimeoutRef.current);
+          const files = Array.from(e.target.files || []);
+          const previews = files.length > 0
+            ? files.map(f => ({ previewUrl: URL.createObjectURL(f), file: f, uploading: false, url: null }))
+            : null;
+          setEditorImages(previews);
+          setEditorOpen(true);
+          if (fabFileRef.current) fabFileRef.current.value = '';
+        }} />
+
       {/* FAB — 快速创建 */}
       {!editorOpen && (
-        <button onClick={() => setEditorOpen(true)}
+        <button onClick={() => {
+            fabFileRef.current?.click();
+            // 如果用户取消选图，500ms 后自动打开纯文本编辑器
+            fabTimeoutRef.current = setTimeout(() => {
+              setEditorImages(null);
+              setEditorOpen(true);
+            }, 600);
+          }}
           className="fixed z-60 flex items-center justify-center shadow-lg transition-transform active:scale-90"
           style={{
             right: 20, bottom: 110,
             width: 50, height: 50, borderRadius: '50%',
             background: 'var(--accent-400)', color: '#fff',
             border: 'none', cursor: 'pointer', fontSize: 24,
-          }}>
+          }}
+          title="写笔记">
           +
         </button>
       )}

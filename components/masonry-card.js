@@ -16,7 +16,7 @@ window.Kawa.MasonryCard = ({ card, objectives, relativeTime, onOpen }) => {
   const obj = objectives.find(o => o.id === card.objective_id);
   const title = card.ai_metadata?.task_title || card.raw_content?.slice(0, 20) || '';
   const body = card.raw_content || '';
-  const hasImg = !!card.image_url;
+  const hasImg = !!(card.ai_metadata?.images?.length || card.image_url);
   const isTodo = card.type === 'todo';
   const isDone = card.status === 'done';
 
@@ -89,6 +89,9 @@ window.Kawa.MasonryCard = ({ card, objectives, relativeTime, onOpen }) => {
 
   // ═══ 笔记卡：Ins 风宽大文章卡 ═══
   const accentColor = obj?.color || '#D4D4D4';
+  const allImages = card.ai_metadata?.images || (card.image_url ? [card.image_url] : []);
+  const showImg = allImages.length > 0;
+  const extraCount = allImages.length - 1;
 
   return React.createElement('div', {
     className: 'transition-all duration-200 cursor-pointer active:scale-[0.98]',
@@ -100,11 +103,11 @@ window.Kawa.MasonryCard = ({ card, objectives, relativeTime, onOpen }) => {
       opacity: isDone ? 0.5 : 1,
       overflow: 'hidden',
       position: 'relative',
-      boxShadow: hasImg ? '0 2px 12px rgba(0,0,0,0.05)' : 'none',
+      boxShadow: showImg ? '0 2px 12px rgba(0,0,0,0.05)' : 'none',
     }
   },
     // ── 左侧色条（纯文本卡）──
-    !hasImg && React.createElement('div', {
+    !showImg && React.createElement('div', {
       key: 'bar',
       style: {
         position: 'absolute', left: 0, top: 12, bottom: 12,
@@ -114,11 +117,23 @@ window.Kawa.MasonryCard = ({ card, objectives, relativeTime, onOpen }) => {
     }),
 
     // ── 图片 ──
-    hasImg && React.createElement('img', {
-      key: 'img', src: card.image_url, alt: title,
-      style: { width: '100%', display: 'block', objectFit: 'cover', maxHeight: 240 },
-      loading: 'lazy',
-    }),
+    showImg && React.createElement('div', { key: 'img-wrap', style: { position: 'relative' } },
+      React.createElement('img', {
+        key: 'img',
+        src: allImages[0],
+        alt: title,
+        style: { width: '100%', display: 'block', objectFit: 'cover', maxHeight: 240 },
+        loading: 'lazy',
+      }),
+      extraCount > 0 && React.createElement('span', {
+        key: 'badge',
+        style: {
+          position: 'absolute', bottom: 8, right: 8,
+          background: 'rgba(0,0,0,0.55)', color: '#fff',
+          fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 9999,
+        }
+      }, '+' + extraCount),
+    ),
 
     // ── 内容 ──
     React.createElement('div', {

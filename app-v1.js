@@ -4,7 +4,7 @@
 // 模块二：沉淀瀑布流（双列 Masonry）
 // ==========================================
 const { useState, useEffect, useRef, useMemo } = React;
-const { Top3Focus, Omnibox, CardDetail, MasonryCard, CalendarHeatmap, callAI, parseTime, localParse, matchObj, load, save, storageAvailable, loadFromSB, saveEventToSB, deleteEventFromSB, saveObjToSB, deleteObjFromSB, uid, fmtTime, fmtDate, tsDay, todayStr, OBJ_PALETTE, TYPE_LABELS, EV_KEY, OBJ_KEY, MOCK_OBJS, MOCK_EVENTS, Ic } = window.Kawa;
+const { Top3Focus, Omnibox, CardDetail, MasonryCard, CalendarHeatmap, PostEditor, callAI, parseTime, localParse, matchObj, load, save, storageAvailable, loadFromSB, saveEventToSB, deleteEventFromSB, saveObjToSB, deleteObjFromSB, uid, fmtTime, fmtDate, tsDay, todayStr, OBJ_PALETTE, TYPE_LABELS, EV_KEY, OBJ_KEY, MOCK_OBJS, MOCK_EVENTS, Ic } = window.Kawa;
 
 const App = () => {
   // ── 数据层（与现有 app.js 完全相同）──
@@ -22,6 +22,7 @@ const App = () => {
   const [activeTag, setActiveTag] = useState(null);   // Tag 筛选
   const [selectedDate, setSelectedDate] = useState(null); // 热力图日期筛选
   const [selectedCard, setSelectedCard] = useState(null);  // 详情浮层
+  const [editorOpen, setEditorOpen] = useState(false);     // 发布编辑器
 
   // 瀑布流布局状态
   const [masonryColumns, setMasonryColumns] = useState(2);
@@ -145,6 +146,26 @@ const App = () => {
     toast_('✓ 已完成');
   };
 
+  // 图片上传回调（Omnibox 快速发图）
+  const handleImageSubmit = (imageUrl, caption) => {
+    const ev = {
+      id: uid(), timeline_time: new Date().toISOString(), record_time: new Date().toISOString(),
+      raw_content: caption || '[图片]', type: 'note', status: 'pending',
+      ai_metadata: { task_title: caption ? (caption.length > 12 ? caption.substring(0, 11) + '…' : caption) : '图片记录', progress_delta: 0 },
+      image_url: imageUrl
+    };
+    setEvents(prev => [ev, ...prev]);
+    saveEventToSB(ev);
+    toast_('图片已上传');
+  };
+
+  // PostEditor 发布回调
+  const handlePublish = (ev) => {
+    setEvents(prev => [ev, ...prev]);
+    saveEventToSB(ev);
+    toast_('笔记已发布');
+  };
+
   // ── 卡片详情操作 ──
   const handleCardSave = (id, data) => {
     setEvents(prev => {
@@ -238,6 +259,29 @@ const App = () => {
         />
       )}
 
+      {/* 发布编辑器 */}
+      {editorOpen && (
+        <PostEditor
+          objectives={objectives}
+          onPublish={handlePublish}
+          onClose={() => setEditorOpen(false)}
+        />
+      )}
+
+      {/* FAB — 快速创建 */}
+      {!editorOpen && (
+        <button onClick={() => setEditorOpen(true)}
+          className="fixed z-60 flex items-center justify-center shadow-lg transition-transform active:scale-90"
+          style={{
+            right: 20, bottom: 110,
+            width: 50, height: 50, borderRadius: '50%',
+            background: 'var(--accent-400)', color: '#fff',
+            border: 'none', cursor: 'pointer', fontSize: 24,
+          }}>
+          +
+        </button>
+      )}
+
       {/* Storage warning */}
       {storageWarn && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-[90] animate-in" style={{ maxWidth: '90vw' }}>
@@ -327,7 +371,7 @@ const App = () => {
 
       {/* Omnibox（底部输入栏，复用现有组件） */}
       <div className="relative z-20 flex-shrink-0">
-        <Omnibox onSubmitText={handleSubmit} isProcessing={processing} onChatOpen={() => {}} />
+        <Omnibox onSubmitText={handleSubmit} isProcessing={processing} onChatOpen={() => {}} onImageSubmit={handleImageSubmit} />
       </div>
     </div>
   );

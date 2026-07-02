@@ -1,10 +1,12 @@
+require('dotenv').config();
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 8765;
-const HTML_FILE = path.join(__dirname, 'index.html');
-const V1_FILE = path.join(__dirname, 'v1.html');
+const WEB_DIST = path.join(__dirname, 'web', 'dist');
+const WEB_INDEX = path.join(WEB_DIST, 'index.html');
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -156,7 +158,7 @@ const server = http.createServer((req, res) => {
             temperature: 0.3,
             response_format: { type: 'json_object' },
           });
-        } else if (engine === 'chat' && body.history) {
+        } else if (engine === 'chat' && parsed.history) {
           if (!DEEPSEEK_KEY) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             return res.end(JSON.stringify({ error: { code: 'api_key_missing', message: '未配置 DeepSeek API 密钥' } }));
@@ -170,7 +172,7 @@ const server = http.createServer((req, res) => {
 引导用户梳理今天做了什么、明天计划什么。当用户提到具体任务或事件时，主动询问是否需要提炼成时间线卡片。
 用户说"完成"或"就这样"时，提醒点击"完成提炼"按钮生成卡片。
 不要输出 JSON，只输出自然语言。` },
-            ...body.history
+            ...parsed.history
           ];
           targetUrl = 'https://api.deepseek.com/v1/chat/completions';
           headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${DEEPSEEK_KEY}` };
@@ -179,14 +181,14 @@ const server = http.createServer((req, res) => {
             messages: chatMessages,
             temperature: 0.7,
           });
-        } else if (engine === 'extract' && body.history) {
+        } else if (engine === 'extract' && parsed.history) {
           if (!DEEPSEEK_KEY) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             return res.end(JSON.stringify({ error: { code: 'api_key_missing', message: '未配置 DeepSeek API 密钥' } }));
           }
           const now = new Date();
           const nowStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}T${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:00+08:00`;
-          const convoText = body.history.map(m => `${m.role === 'user' ? '用户' : 'AI'}: ${m.content}`).join('\n\n');
+          const convoText = parsed.history.map(m => `${m.role === 'user' ? '用户' : 'AI'}: ${m.content}`).join('\n\n');
           targetUrl = 'https://api.deepseek.com/v1/chat/completions';
           headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${DEEPSEEK_KEY}` };
           targetBody = JSON.stringify({
@@ -415,12 +417,22 @@ const server = http.createServer((req, res) => {
     return res.end(JSON.stringify({ status: 'ok', version: '2.0.0' }));
   }
 
-  // Serve v1.0 for root, old timeline at /index.html
+  // Serve new Vite-built app at root
   if (url.pathname === '/') {
-    return serveFile(res, V1_FILE);
+    if (fs.existsSync(WEB_INDEX)) {
+      return serveFile(res, WEB_INDEX);
+    }
+    // 404 if not built yet
+    res.writeHead(503);
+    return res.end('Frontend not built. Run: cd web && npm run build');
   }
-  if (url.pathname === '/index.html' || url.pathname === '/timeline') {
-    return serveFile(res, HTML_FILE);
+
+  // Serve web/dist static assets (hashed JS/CSS)
+  if (url.pathname.startsWith('/assets/')) {
+    const webAsset = path.join(WEB_DIST, url.pathname);
+    if (fs.existsSync(webAsset) && fs.statSync(webAsset).isFile()) {
+      return serveFile(res, webAsset);
+    }
   }
 
   // Serve static files from project root

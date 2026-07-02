@@ -2,7 +2,7 @@ services:
   - type: web
     name: kawakami
     runtime: node
-    buildCommand: ""
+    buildCommand: cd web && npm ci && npm run build
     startCommand: node server.js
     plan: free
     envVars:
